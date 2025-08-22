@@ -63,7 +63,9 @@ class WebMvcConfig : WebMvcConfigurer {
                 "http://192.168.0.161:3004",
                 "http://localhost:3004",
                 "https://8d6cf68ed0a4.ngrok-free.app",
-                "https://tender-dryers-exist.loca.lt"
+                "https://tender-dryers-exist.loca.lt",
+                "https://talksy-m6ja.onrender.com"
+
             )
             .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
             .allowedHeaders("*")
@@ -125,8 +127,7 @@ class WebSocketConfig(private val jwtService: JwtService) : WebSocketMessageBrok
                 "http://192.168.0.161:3004",
                 "http://localhost:3004",
                 "https://8d6cf68ed0a4.ngrok-free.app",
-                "https://vast-days-dream.loca.lt",
-                "https://tender-dryers-exist.loca.lt"
+                "https://talksy-m6ja.onrender.com"
             )
             .addInterceptors(JwtHandshakeInterceptor(jwtService))
             .setHandshakeHandler(JwtHandshakeHandler())
@@ -144,7 +145,9 @@ class WebSocketConfig(private val jwtService: JwtService) : WebSocketMessageBrok
                 "http://192.168.0.161:3004",
                 "http://localhost:3004",
                 "https://8d6cf68ed0a4.ngrok-free.app",
-                "https://tender-dryers-exist.loca.lt"
+                "https://tender-dryers-exist.loca.lt",
+                "https://talksy-m6ja.onrender.com"
+
             )
             allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
             allowedHeaders = listOf("*")
