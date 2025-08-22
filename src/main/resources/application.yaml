@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: Talksy
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/talksy_chat
+    username: talksy_chat
+    password: 123
+
+telegram:
+  bot:
+    token: 8449372062:AAE9bUlVdkuEpvFALve9CGdHdxbIoPRcu-U
+jwt:
+  secret: "superSecretKeyForJwtSigningChangeThisToStrongKey123!"
+  expiration: 3600000
