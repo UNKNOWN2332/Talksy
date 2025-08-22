@@ -1,16 +1,12 @@
 package uz.shukrullaev.com.talksy
 
 import jakarta.persistence.EntityNotFoundException
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.messaging.simp.SimpMessagingTemplate
-import org.springframework.stereotype.Component
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
 import java.time.Instant
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 
 /**
@@ -18,6 +14,15 @@ import javax.crypto.spec.SecretKeySpec
  * @author Abdulloh
  * @since 18/08/2025 6:09 pm
  */
+
+fun getTelegramId(): String =
+    (SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken)
+        ?.token
+        ?.claims
+        ?.get("telegramId")
+        ?.toString()
+        ?: throw IllegalStateException("TelegramId not found in security context")
+
 
 interface UserService {
 
@@ -47,12 +52,12 @@ interface UserService {
 
 interface ChatService {
     fun createChat(request: ChatRequestDTO): ChatResponseDTO
-    fun getUserChats(userId: Long): List<ChatResponseDTO>
+    fun getUserChats(username: String): List<ChatResponseDTO>
 }
 
 interface MessageService {
     fun sendMessage(request: MessageRequestDTO): MessageResponseDTO
-    fun getMessages(chatId: Long): List<MessageResponseDTO>
+    fun getMessages(username: String): List<MessageResponseDTO>
 }
 
 
@@ -89,71 +94,76 @@ class UserServiceImpl(
     }
 
 }
-//
-//@Service
-//class ChatServiceImpl(
-//    private val chatRepository: ChatRepository,
-//    private val userRepository: UserRepository,
-//    private val chatUserRepository: ChatUserRepository
-//) : ChatService {
-//
-//    @Transactional
-//    override fun createChat(request: ChatRequestDTO): ChatResponseDTO {
-//
-//        val owner = userRepository.findById(ownerId)
-//            .orElseThrow { UserNotFound() }
-//
-//        val chat = chatRepository.save(request.toEntity())
-//
-//        val chatUser = ChatUser(
-//            joinedDate = Instant.now(),
-//            isOwner = true,
-//            chat = chat,
-//            user = owner
-//        )
-//        chatUserRepository.save(chatUser)
-//
-//        return chat.toDTO()
-//    }
-//
-//    override fun getUserChats(userId: Long): List<ChatResponseDTO> {
-//        val chats = chatUserRepository.findByUserId(userId).map { it.chat }
-//        return chats.map { it.toDTO() }
-//    }
-//}
-//
-//
-//@Service
-//class MessageServiceImpl(
-//    private val messageRepository: MessageRepository,
-//    private val chatRepository: ChatRepository,
-//    private val userRepository: UserRepository,
-//    private val messagingTemplate: SimpMessagingTemplate
-//) : MessageService {
-//
-//    @Transactional
-//    override fun sendMessage(request: MessageRequestDTO): MessageResponseDTO {
-//        val chat = chatRepository.findById(request.chatId)
-//            .orElseThrow { ChatNotFound(request.chatId) }
-//
-//        val sender = userRepository.findById(request.senderId)
-//            .orElseThrow { SenderNotFound(request.senderId) }
-//
-//        val replyTo = request.replyToId?.let {
-//            messageRepository.findById(it).orElse(null)
-//        }
-//
-//        val message = messageRepository.save(request.toEntity(chat, sender, replyTo))
-//
-//        messagingTemplate.convertAndSend(
-//            "/topic/chat/${chat.id}",
-//            message.toDTO()
-//        )
-//
-//        return message.toDTO()
-//    }
-//
-//    override fun getMessages(chatId: Long): List<MessageResponseDTO> {
-//        return messageRepository.findbyTelegramId(chatId).map { it.toDTO() }
-//    }
-//}
+
+@Service
+class ChatServiceImpl(
+    private val chatRepository: ChatRepository,
+    private val userRepository: UserRepository,
+    private val chatUserRepository: ChatUserRepository
+) : ChatService {
+
+    @Transactional
+    override fun createChat(request: ChatRequestDTO): ChatResponseDTO {
+        val telegramId = getTelegramId()
+        val owner = userRepository.findByTelegramIdAndDeletedFalse(telegramId)
+            ?: throw UserNotFound()
+
+        val chat = chatRepository.save(request.toEntity())
+
+        val chatUser = ChatUser(
+            joinedDate = Instant.now(),
+            isOwner = true,
+            chat = chat,
+            user = owner
+        )
+        chatUserRepository.save(chatUser)
+
+        return chat.toDTO()
+    }
+
+    override fun getUserChats(username: String): List<ChatResponseDTO> {
+        val user = userRepository.findByUsernameAndDeletedFalse(username)
+            ?: throw UserNotFound()
+        val chats = chatUserRepository.findAllByUserIdAndDeletedFalse(user.id!!)
+            .map { it.chat }
+        return chats.map { it.toDTO() }
+    }
+}
+
+@Service
+class MessageServiceImpl(
+    private val messageRepository: MessageRepository,
+    private val chatRepository: ChatRepository,
+    private val userRepository: UserRepository,
+    private val messagingTemplate: SimpMessagingTemplate
+) : MessageService {
+
+    @Transactional
+    override fun sendMessage(request: MessageRequestDTO): MessageResponseDTO {
+        val chat = chatRepository.findById(request.chatId)
+            .orElseThrow { ChatNotFound(request.chatId) }
+
+        val sender = userRepository.findById(request.senderId)
+            .orElseThrow { SenderNotFound(request.senderId) }
+
+        val replyTo = request.replyToId?.let {
+            messageRepository.findById(it).orElse(null)
+        }
+
+        val message = messageRepository.save(request.toEntity(chat, sender, replyTo))
+
+        messagingTemplate.convertAndSend(
+            "/topic/chat/${chat.id}",
+            message.toDTO()
+        )
+
+        return message.toDTO()
+    }
+
+    override fun getMessages(username: String): List<MessageResponseDTO> {
+        val user = userRepository.findByUsernameAndDeletedFalse(username)
+            ?: throw UserNotFound()
+        return messageRepository.findAllBySenderIdAndDeletedFalse(user.id!!)
+            .map { it.toDTO() }
+    }
+}

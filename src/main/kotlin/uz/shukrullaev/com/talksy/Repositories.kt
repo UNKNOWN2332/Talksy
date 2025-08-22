@@ -71,37 +71,27 @@ interface UserRepository : BaseRepository<User> {
 
 @Repository
 interface ChatRepository : BaseRepository<Chat> {
-
     fun findAllByIsGroupAndDeletedFalse(isGroup: Boolean): List<Chat>
-
 }
 
 @Repository
 interface MessageRepository : BaseRepository<Message> {
-
     fun findAllByChatIdAndDeletedFalse(chatId: Long): List<Message>
-
     fun findAllBySenderIdAndDeletedFalse(senderId: Long): List<Message>
-
-    fun findByReplyToIdAndDeletedFalse(replyToId: Long): List<Message>
+    fun findAllByReplyToIdAndDeletedFalse(replyToId: Long): List<Message>
 }
 
 @Repository
 interface ChatUserRepository : BaseRepository<ChatUser> {
-
     fun findAllByChatIdAndDeletedFalse(chatId: Long): List<ChatUser>
-
     fun findAllByUserIdAndDeletedFalse(userId: Long): List<ChatUser>
-
     fun existsByChatIdAndUserIdAndDeletedFalse(chatId: Long, userId: Long): Boolean
-
     fun findByChatIdAndUserIdAndDeletedFalse(chatId: Long, userId: Long): ChatUser?
 }
 
 @Repository
 interface AttachmentRepository : BaseRepository<Attachment> {
-
     fun findAllByMessageIdAndDeletedFalse(messageId: Long): List<Attachment>
-
     fun existsByUrlAndDeletedFalse(url: String): Boolean
 }
+

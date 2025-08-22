@@ -23,36 +23,36 @@ class TelegramAuthController(
 
 }
 
-//@RestController
-//@RequestMapping("/api/messages")
-//class MessageController(
-//    private val messageService: MessageService
-//) {
-//    @PostMapping
-//    fun sendMessage(@RequestBody dto: MessageRequestDTO): MessageResponseDTO =
-//        messageService.sendMessage(dto)
-//
-//
-//    @GetMapping("/chat/{chatId}")
-//    fun getMessages(@PathVariable chatId: Long): List<MessageResponseDTO> =
-//        messageService.getMessages(chatId)
-//
-//
-//}
-//
-//@RestController
-//@RequestMapping("/api/chats")
-//class ChatController(
-//    private val chatService: ChatService
-//) {
-//    @PostMapping
-//    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
-//        chatService.createChat(dto)
-//
-//
-//    @GetMapping("/{id}")
-//    fun getChat(@PathVariable id: Long): List<ChatResponseDTO> =
-//        chatService.getUserChats(id)
-//
-//}
+@RestController
+@RequestMapping("/api/messages")
+class MessageController(
+    private val messageService: MessageService
+) {
+    @PostMapping
+    fun sendMessage(@RequestBody dto: MessageRequestDTO): MessageResponseDTO =
+        messageService.sendMessage(dto)
+
+
+    @GetMapping("/chat")
+    fun getMessages(@RequestParam username: String): List<MessageResponseDTO> =
+        messageService.getMessages(username)
+
+
+}
+
+@RestController
+@RequestMapping("/api/chats")
+class ChatController(
+    private val chatService: ChatService
+) {
+    @PostMapping
+    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
+        chatService.createChat(dto)
+
+
+    @GetMapping
+    fun getChat(@RequestParam username: String): List<ChatResponseDTO> =
+        chatService.getUserChats(username)
+
+}
 
