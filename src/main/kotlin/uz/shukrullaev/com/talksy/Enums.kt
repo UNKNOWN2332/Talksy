@@ -13,6 +13,16 @@ enum class ExceptionsCode(val code: Int) {
     USER_NOT_FOUND(101),
     CHAT_NOT_FOUND(102),
     SENDER_NOT_FOUND(103),
+    NOT_CHAT_MEMBER(104),
+    MESSAGE_NOT_FOUND(105)
 
 
+}
+
+enum class Status {
+    NOT_SENT,
+    SENDING,
+    SENT,
+    DELIVERED,
+    READ
 }

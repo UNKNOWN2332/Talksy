@@ -9,29 +9,44 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.context.support.ResourceBundleMessageSource
+import org.springframework.core.convert.converter.Converter
 import org.springframework.http.HttpStatus
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
 import org.springframework.messaging.simp.config.MessageBrokerRegistry
+import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.stereotype.Service
-import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
-import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration
 import org.springframework.web.socket.server.HandshakeInterceptor
 import org.springframework.web.socket.server.support.DefaultHandshakeHandler
+import java.nio.charset.StandardCharsets
 import java.security.Key
 import java.security.Principal
 import java.util.*
+import javax.crypto.spec.SecretKeySpec
+import jakarta.servlet.FilterChain
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
+import org.springframework.stereotype.Component
+import org.springframework.web.filter.OncePerRequestFilter
+
 
 /**
  * @see uz.shukrullaev.com.talksy
@@ -73,11 +88,24 @@ class WebMvcConfig : WebMvcConfigurer {
             .maxAge(3600)
     }
 }
+@Configuration
+class JwtDecoderConfig(
+    @Value("\${jwt.secret}") private val secret: String
+) {
+
+    @Bean
+    fun jwtDecoder(): JwtDecoder {
+        val key = SecretKeySpec(secret.toByteArray(StandardCharsets.UTF_8), "HmacSHA256")
+        return NimbusJwtDecoder.withSecretKey(key).build()
+    }
+}
 
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig {
+class SecurityConfig(
+    private val jwtAuthenticationFilter: JwtAuthenticationFilter
+) {
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
@@ -88,12 +116,15 @@ class SecurityConfig {
                 auth
                     .requestMatchers(
                         "/", "/index.html", "/favicon.ico",
-                        "/css/**", "/js/**", "/images/**",
+                        "/css/**", "/js/**", "/images/**", "home.html", "chat.html",
                         "/api/auth/**", "/api/auth/login",
-                        "/ws/**"
+                        "/ws/info/**"
                     ).permitAll()
+                    .requestMatchers("/ws/**").authenticated()
                     .anyRequest().authenticated()
             }
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+
         return http.build()
     }
 
@@ -105,15 +136,14 @@ class SecurityConfig {
     }
 }
 
-
 @Configuration
 @EnableWebSocketMessageBroker
 class WebSocketConfig(private val jwtService: JwtService) : WebSocketMessageBrokerConfigurer {
+
     override fun configureMessageBroker(registry: MessageBrokerRegistry) {
         registry.enableSimpleBroker("/topic", "/queue")
         registry.setUserDestinationPrefix("/user")
         registry.setApplicationDestinationPrefixes("/app")
-
     }
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
@@ -127,33 +157,11 @@ class WebSocketConfig(private val jwtService: JwtService) : WebSocketMessageBrok
                 "http://192.168.0.161:3004",
                 "http://localhost:3004",
                 "https://8d6cf68ed0a4.ngrok-free.app",
-                "https://talksy-m6ja.onrender.com"
+                "https://talksy-m6ja.onrender.com",
+                "*"
             )
             .addInterceptors(JwtHandshakeInterceptor(jwtService))
             .setHandshakeHandler(JwtHandshakeHandler())
-            .withSockJS()
-    }
-
-    override fun configureWebSocketTransport(registry: WebSocketTransportRegistration) {
-        val corsConfig = CorsConfiguration().apply {
-            allowedOrigins = listOf(
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://192.168.0.1:3000",
-                "https://93a8c02c76fb.ngrok-free.app",
-                "https://contracts-demo.netlify.app",
-                "http://192.168.0.161:3004",
-                "http://localhost:3004",
-                "https://8d6cf68ed0a4.ngrok-free.app",
-                "https://tender-dryers-exist.loca.lt",
-                "https://talksy-m6ja.onrender.com"
-
-            )
-            allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            allowedHeaders = listOf("*")
-            allowCredentials = true
-        }
-        registry.setMessageSizeLimit(512 * 1024)
     }
 }
 
@@ -171,6 +179,7 @@ class JwtHandshakeHandler : DefaultHandshakeHandler() {
 class JwtHandshakeInterceptor(
     private val jwtService: JwtService
 ) : HandshakeInterceptor {
+
     override fun beforeHandshake(
         request: ServerHttpRequest,
         response: ServerHttpResponse,
@@ -178,16 +187,22 @@ class JwtHandshakeInterceptor(
         attributes: MutableMap<String, Any>
     ): Boolean {
         val authHeader = request.headers.getFirst("Authorization")
+        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED)
+            return false
+        }
 
-        if (!authHeader.isNullOrBlank() && authHeader.startsWith("Bearer ")) {
+        try {
             val token = authHeader.removePrefix("Bearer ").trim()
             val userId = jwtService.extractUserId(token)
             attributes["userId"] = userId
+            // Optionally set authentication for WebSocket context
+            SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(userId, null, emptyList())
             return true
+        } catch (e: Exception) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED)
+            return false
         }
-
-        response.setStatusCode(HttpStatus.FORBIDDEN)
-        return false
     }
 
     override fun afterHandshake(
@@ -226,7 +241,6 @@ class JwtService(
         return TokenDTO(token, now, expiry)
     }
 
-
     fun extractUserId(token: String): String {
         val claims = extractAllClaims(token)
         return claims["telegramId"] as String
@@ -238,5 +252,45 @@ class JwtService(
             .build()
             .parseClaimsJws(token)
             .body
+    }
+}
+
+
+@Component
+class JwtAuthenticationFilter(
+    private val jwtService: JwtService
+) : OncePerRequestFilter() {
+
+    override fun doFilterInternal(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        filterChain: FilterChain
+    ) {
+        val authHeader = request.getHeader("Authorization")
+
+        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response)
+            return
+        }
+
+        try {
+            val jwt = authHeader.removePrefix("Bearer ").trim()
+            val userId = jwtService.extractUserId(jwt)
+
+            if (SecurityContextHolder.getContext().authentication == null) {
+                val authentication = UsernamePasswordAuthenticationToken(
+                    userId, null, emptyList()
+                )
+                authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
+                SecurityContextHolder.getContext().authentication = authentication
+            }
+
+            filterChain.doFilter(request, response)
+        } catch (e: Exception) {
+            // Log the error if needed
+            logger.error("JWT validation failed: ${e.message}")
+            response.status = HttpServletResponse.SC_UNAUTHORIZED
+            return
+        }
     }
 }

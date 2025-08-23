@@ -15,16 +15,18 @@ import javax.crypto.spec.SecretKeySpec
  * @since 19/08/2025 6:35 pm
  */
 
-@Component
-class BotConfig(@Value("\${telegram.bot.token}") val botToken: String) {
-    init {
-        GlobalBotToken.value = botToken
-    }
-}
-
 object GlobalBotToken {
     lateinit var value: String
 }
+
+@Component
+class BotConfig(@Value("\${telegram.bot.token}") botToken: String) {
+    init {
+        GlobalBotToken.value = botToken
+        println("Bot token loaded: ${GlobalBotToken.value.take(5)}...") // check
+    }
+}
+
 
 @Component
 class HashUtils(){

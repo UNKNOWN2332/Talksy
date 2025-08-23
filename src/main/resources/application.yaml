@@ -22,3 +22,6 @@ telegram:
 jwt:
   secret: "superSecretKeyForJwtSigningChangeThisToStrongKey123!"
   expiration: 3600000
+logging:
+  level:
+    org.springframework.security: DEBUG

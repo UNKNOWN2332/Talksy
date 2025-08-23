@@ -87,18 +87,16 @@ fun Chat.toDTO() = ChatResponseDTO(
 data class MessageRequestDTO(
     val content: String?,
     @field:NotNull val chatId: Long,
-    @field:NotNull val senderId: Long,
     val replyToId: Long? = null
 )
 
-data class MessageResponseDTO(
+data class MessageResponseDto(
     val id: Long,
-    val content: String?,
-    val createdDate: Instant?,
     val chatId: Long,
-    val senderId: Long,
-    val replyToId: Long?,
-    val attachments: List<AttachmentResponseDTO> = emptyList()
+    val sender: String,
+    val content: String,
+    val createdDate: Instant,
+    val status: Status
 )
 
 fun MessageRequestDTO.toEntity(chat: Chat, sender: User, replyTo: Message? = null) = Message(
@@ -108,14 +106,13 @@ fun MessageRequestDTO.toEntity(chat: Chat, sender: User, replyTo: Message? = nul
     replyTo = replyTo
 )
 
-fun Message.toDTO() = MessageResponseDTO(
+fun Message.toResponseDto(status: Status) = MessageResponseDto(
     id = id!!,
-    content = content,
-    createdDate = createdDate,
     chatId = chat.id!!,
-    senderId = sender.id!!,
-    replyToId = replyTo?.id,
-    attachments = emptyList()
+    sender = sender.username!!,
+    content = content!!,
+    createdDate = createdDate!!,
+    status = status
 )
 
 
@@ -184,4 +181,14 @@ fun Attachment.toDTO() = AttachmentResponseDTO(
     size = size,
     duration = duration,
     messageId = message.id!!
+)
+
+data class ChatRequestDtoForUsers(
+    val username: String
+)
+
+data class ChatResponseDtoForUsers(
+    val id: Long,
+    val participants: List<String>,
+    val createdDate: Instant
 )

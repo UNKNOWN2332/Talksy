@@ -43,23 +43,32 @@ class GlobalExceptionHandler(
 }
 
 
-class TelegramDataIsNotValid(private val requestDTO: UserRequestDTO) : ExceptionUtil() {
+class TelegramDataIsNotValid(private val requestDTO: UserRequestDTO? = null) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.TELEGRAM_NOT_VALID
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(requestDTO)
 }
 
 
-class UserNotFound(private val requestDTO: UserRequestDTO? = null) : ExceptionUtil() {
+class UserNotFoundException : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.USER_NOT_FOUND
-    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(requestDTO)
 }
 
-class ChatNotFound(private val chatId: Long) : ExceptionUtil() {
+
+class ChatNotFoundException(private val chatId: Long) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.CHAT_NOT_FOUND
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(chatId)
 }
 
-class SenderNotFound(private val senderId: Long) : ExceptionUtil() {
+class SenderNotFoundException(private val senderId: Long) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.SENDER_NOT_FOUND
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(senderId)
+}
+
+class NotChatMemberException : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.NOT_CHAT_MEMBER
+}
+
+class MessageNotFoundException(private val messageId: Long) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.MESSAGE_NOT_FOUND
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(messageId)
 }

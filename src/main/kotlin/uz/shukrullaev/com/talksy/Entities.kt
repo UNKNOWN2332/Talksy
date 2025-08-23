@@ -72,3 +72,11 @@ class Attachment(
     @Column(nullable = false, unique = true) var fileHash: String? = null,
     @ManyToOne(optional = false) var message: Message
 ) : BaseEntity()
+
+@Entity
+class MessageStatus(
+    @ManyToOne var message: Message,
+    @ManyToOne var user: User,
+    @Enumerated(EnumType.STRING)
+    var status: Status
+): BaseEntity()

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Page</title>
+</head>
+<body>
+<h1>Chat Page</h1>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+<script>
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+        window.location.href = "/index.html";
+    }
+
+    const socket = new SockJS("http://localhost:8080/ws");
+    const stompClient = Stomp.over(socket);
+
+    stompClient.connect({ 'Authorization': 'Bearer ' + token }, function(frame) {
+        console.log("Connected: " + frame);
+
+        // private chat subscription
+        stompClient.subscribe("/user/queue/messages", function(message) {
+            console.log("New message:", message.body);
+        });
+    });
+</script>
+</body>
+</html>

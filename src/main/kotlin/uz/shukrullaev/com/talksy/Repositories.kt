@@ -67,11 +67,28 @@ interface UserRepository : BaseRepository<User> {
     fun findByUsername(username: String): User?
 
     fun findByUsernameAndDeletedFalse(username: String): User?
+
+    fun existsByUsernameAndDeletedFalse(username: String): Boolean
+
+    @Query("select u from User u where u.deleted = false and lower(u.username) like lower(concat('%', :keyword, '%'))")
+    fun searchByUsername(@Param("keyword") keyword: String): List<User>
 }
 
 @Repository
 interface ChatRepository : BaseRepository<Chat> {
+
     fun findAllByIsGroupAndDeletedFalse(isGroup: Boolean): List<Chat>
+
+    @Query("""
+        select c from Chat c
+        join ChatUser cu1 on cu1.chat.id = c.id
+        join ChatUser cu2 on cu2.chat.id = c.id
+        where c.isGroup = false
+          and cu1.user.id = :userId1
+          and cu2.user.id = :userId2
+          and c.deleted = false
+    """)
+    fun findDirectChat(@Param("userId1") userId1: Long, @Param("userId2") userId2: Long): Chat?
 }
 
 @Repository
@@ -79,15 +96,25 @@ interface MessageRepository : BaseRepository<Message> {
     fun findAllByChatIdAndDeletedFalse(chatId: Long): List<Message>
     fun findAllBySenderIdAndDeletedFalse(senderId: Long): List<Message>
     fun findAllByReplyToIdAndDeletedFalse(replyToId: Long): List<Message>
+
+    fun findAllByChatIdAndDeletedFalse(chatId: Long, pageable: Pageable): Page<Message>
 }
 
 @Repository
 interface ChatUserRepository : BaseRepository<ChatUser> {
+
     fun findAllByChatIdAndDeletedFalse(chatId: Long): List<ChatUser>
+
     fun findAllByUserIdAndDeletedFalse(userId: Long): List<ChatUser>
+
     fun existsByChatIdAndUserIdAndDeletedFalse(chatId: Long, userId: Long): Boolean
+
     fun findByChatIdAndUserIdAndDeletedFalse(chatId: Long, userId: Long): ChatUser?
+
+    @Query("select cu.user from ChatUser cu where cu.chat.id = :chatId and cu.deleted = false")
+    fun findUsersByChatId(@Param("chatId") chatId: Long): List<User>
 }
+
 
 @Repository
 interface AttachmentRepository : BaseRepository<Attachment> {
@@ -95,3 +122,9 @@ interface AttachmentRepository : BaseRepository<Attachment> {
     fun existsByUrlAndDeletedFalse(url: String): Boolean
 }
 
+@Repository
+interface MessageStatusRepository : BaseRepository<MessageStatus> {
+
+    @Query("select ms from MessageStatus ms where ms.user.id = :userId and ms.message.chat.id = :chatId and ms.deleted = false")
+    fun findAllByUserIdAndMessageChatId(@Param("userId") userId: Long, @Param("chatId") chatId: Long): List<MessageStatus>
+}
