@@ -15,9 +15,11 @@ import org.springframework.web.multipart.MultipartFile
  * @since 18/08/2025 6:09 pm
  */
 
-@Controller
-class TelegramAuthController(
+@RestController
+@RequestMapping("api/auth")
+class TelegramLogin(
     private val userService: UserService
+
 ) {
     @PostMapping("/login")
     fun telegramCallback(
@@ -29,6 +31,12 @@ class TelegramAuthController(
         @RequestParam("file") file: MultipartFile
     ): String = userService.uploadImage(file)
 
+}
+
+@Controller
+class TelegramAuthController(
+    private val userService: UserService
+) {
     @MessageMapping("me")
     @SendToUser("/queue/me")
     fun me(): UserResponseDTO = userService.me()
