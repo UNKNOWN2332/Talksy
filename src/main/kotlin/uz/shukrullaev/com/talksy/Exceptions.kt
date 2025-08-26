@@ -49,9 +49,25 @@ class TelegramDataIsNotValid(private val requestDTO: UserRequestDTO? = null) : E
 }
 
 
-class UserNotFoundException : ExceptionUtil() {
+class UserNotFoundException(val username: String? = null) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.USER_NOT_FOUND
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(username)
+
 }
+
+class ObjectIdNullException(): ExceptionUtil(){
+    override fun exceptionType() = ExceptionsCode.ID_ISNULL
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf()
+}
+
+class ChatIsNotGroupException(val isGroup: Boolean): ExceptionUtil(){
+    override fun exceptionType(): ExceptionsCode = ExceptionsCode.ID_ISNULL
+
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(isGroup)
+
+
+}
+
 
 
 class ChatNotFoundException(private val chatId: Long) : ExceptionUtil() {

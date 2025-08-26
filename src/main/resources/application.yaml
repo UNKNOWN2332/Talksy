@@ -6,14 +6,14 @@ spring:
       ddl-auto: update
     show-sql: true
   datasource:
-#    driver-class-name: org.postgresql.Driver
-#    url: jdbc:postgresql://localhost:5432/talksy_chat
-#    username:  talksy_chat
-#    password: 123
-      driver-class-name: org.postgresql.Driver
-      url: jdbc:postgresql://dpg-d2k3ha63jp1c73fosq4g-a.oregon-postgres.render.com:5432/talksy_db
-      username: talksy_db_user
-      password: EdtM2nvNwyH17VPtfmf7rHNVeQYQWOkp
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/talksy_chat
+    username:  talksy_chat
+    password: 123
+#      driver-class-name: org.postgresql.Driver
+#      url: jdbc:postgresql://dpg-d2k3ha63jp1c73fosq4g-a.oregon-postgres.render.com:5432/talksy_db
+#      username: talksy_db_user
+#      password: EdtM2nvNwyH17VPtfmf7rHNVeQYQWOkp
 
 
 telegram:
@@ -25,3 +25,9 @@ jwt:
 logging:
   level:
     org.springframework.security: DEBUG
+
+file:
+  attachments:
+    path: "uploads/attachments"
+  image:
+    path: "uploads/images"

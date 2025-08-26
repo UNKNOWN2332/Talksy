@@ -8,7 +8,6 @@ import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.jpa.domain.support.AuditingEntityListener
 import java.time.Instant
 
-
 /**
  * @see uz.shukrullaev.com.talksy
  * @author Abdulloh
@@ -38,10 +37,27 @@ class User(
 ) : BaseEntity()
 
 @Entity
+@Table(name = "user_files")
+class UserFile(
+    @Column(nullable = false) var ownerId: Long,
+    @Column(nullable = false) var filePath: String,
+    @Column(nullable = false, unique = true) var sha256Hash: String,
+    @Column(nullable = false, unique = true) var customHash: String
+) : BaseEntity()
+
+@Entity
 @Table(name = "chats")
 class Chat(
     var title: String? = null,
-    @Column(nullable = false) var isGroup: Boolean,
+    @Column(nullable = false) var isGroup: Boolean = false,
+
+    @ManyToMany
+    @JoinTable(
+        name = "chat_participants",
+        joinColumns = [JoinColumn(name = "chat_id")],
+        inverseJoinColumns = [JoinColumn(name = "user_id")]
+    )
+    var participants: MutableList<User> = mutableListOf()
 ) : BaseEntity()
 
 @Entity
@@ -56,10 +72,15 @@ class ChatUser(
 @Entity
 @Table(name = "messages")
 class Message(
-    @Lob var content: String? = null,
     @ManyToOne(optional = false) var chat: Chat,
     @ManyToOne(optional = false) var sender: User,
-    @ManyToOne var replyTo: Message? = null
+    @ManyToOne var replyTo: Message? = null,
+    var caption: String? = null,
+    @Enumerated(EnumType.STRING) @Column(nullable = false) var type: MessageType = MessageType.TEXT,
+    @Lob var content: String? = null,
+    @Column var filePath: String? = null,
+    @OneToMany(mappedBy = "message", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var attachments: MutableList<Attachment> = mutableListOf()
 ) : BaseEntity()
 
 @Entity
@@ -74,9 +95,9 @@ class Attachment(
 ) : BaseEntity()
 
 @Entity
+@Table(name = "message_statuses")
 class MessageStatus(
-    @ManyToOne var message: Message,
-    @ManyToOne var user: User,
-    @Enumerated(EnumType.STRING)
-    var status: Status
-): BaseEntity()
+    @ManyToOne(optional = false) var message: Message,
+    @ManyToOne(optional = false) var user: User,
+    @Enumerated(EnumType.STRING) var status: Status
+) : BaseEntity()

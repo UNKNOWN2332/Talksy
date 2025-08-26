@@ -1,6 +1,5 @@
 package uz.shukrullaev.com.talksy
 
-
 /**
  * @see uz.shukrullaev.com.talksy
  * @author Abdulloh
@@ -8,15 +7,13 @@ package uz.shukrullaev.com.talksy
  */
 
 enum class ExceptionsCode(val code: Int) {
-
     TELEGRAM_NOT_VALID(100),
     USER_NOT_FOUND(101),
     CHAT_NOT_FOUND(102),
     SENDER_NOT_FOUND(103),
     NOT_CHAT_MEMBER(104),
-    MESSAGE_NOT_FOUND(105)
-
-
+    MESSAGE_NOT_FOUND(105),
+    ID_ISNULL(106),
 }
 
 enum class Status {
@@ -25,4 +22,11 @@ enum class Status {
     SENT,
     DELIVERED,
     READ
+}
+
+enum class MessageType {
+    TEXT,
+    VIDEO,
+    AUDIO,
+    MP3,
 }

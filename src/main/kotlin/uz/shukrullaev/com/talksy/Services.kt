@@ -1,12 +1,19 @@
 package uz.shukrullaev.com.talksy
 
 import jakarta.persistence.EntityNotFoundException
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 
 /**
@@ -25,14 +32,7 @@ fun getTelegramId(): String =
 
 
 interface UserService {
-
-    /**
-     * Username bo‘yicha foydalanuvchini topadi.
-     * va User malumot qaytaradi ichida rasmi ham boladi.
-     */
-    fun findByUsername(username: String): UserResponseDTO?
-
-    fun searchUsers(keyword: String): List<UserResponseDTO>
+    fun searchByUsername(username: String): List<UserResponseDTO>
 
     /**
      * Foydalanuvchi profilini yangilash.
@@ -40,6 +40,8 @@ interface UserService {
      * qulay tarafi null bop qogan taqdirda bazaga null saqlanib qolishini oldini oladi
      */
     fun updateProfile(request: UserRequestDTO): UserResponseDTO
+
+    fun uploadImage(file: MultipartFile): String
 
     /**
      * Telegram orqali login
@@ -61,23 +63,22 @@ interface ChatService {
 }
 
 interface MessageService {
-    fun sendMessage(request: MessageRequestDTO): MessageResponseDto
-    fun getChatMessages(chatId: Long): List<MessageResponseDto>
+    fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>? = null): MessageResponseDTO
+    fun getChatMessages(chatId: Long): List<MessageResponseDTO>
 }
-
 
 @Service
 class UserServiceImpl(
     private val userRepository: UserRepository,
     private val jwtService: JwtService,
-    private val hashUtils: HashUtils
+    private val hashUtils: HashUtils,
+    private val fileUtils: FileUtils,
+    private val userFileRepository: UserFileRepository,
+    @Value("\${file.image.path}") private val uploadImageDir: String,
 ) : UserService {
 
-    override fun findByUsername(username: String): UserResponseDTO? =
-        userRepository.findByUsernameAndDeletedFalse(username)?.toDTO()
-
-    override fun searchUsers(keyword: String): List<UserResponseDTO> =
-        userRepository.searchByUsername(keyword).map { it.toDTO() }
+    override fun searchByUsername(username: String): List<UserResponseDTO> =
+        userRepository.searchByUsername(username).map { it.toDTO() }
 
     @Transactional
     override fun updateProfile(request: UserRequestDTO): UserResponseDTO {
@@ -89,6 +90,23 @@ class UserServiceImpl(
         request.lastName?.let { user.lastName = it }
 
         return userRepository.save(user).toDTO()
+    }
+
+
+    @Transactional
+    override fun uploadImage(file: MultipartFile): String {
+        if (file.isEmpty) throw IllegalArgumentException("File is empty!")
+
+        val hash = fileUtils.calculateSHA256(file.bytes)
+        val user = getCurrentUser()
+
+        userFileRepository.findBySha256Hash(hash)?.let { existing ->
+            return linkExistingFile(user, existing)
+        }
+
+        val savedFile = createAndSaveFile(file, hash)
+
+        return linkNewFile(user, savedFile, hash)
     }
 
     @Transactional
@@ -106,6 +124,57 @@ class UserServiceImpl(
             ?.toDTO()
             ?: throw UserNotFoundException()
     }
+
+    private fun getCurrentUser(): User =
+        userRepository.findByTelegramIdAndDeletedFalse(getTelegramId())
+            ?: throw UserNotFoundException()
+
+    private fun linkExistingFile(user: User, existing: UserFile): String {
+        if (!userFileRepository.existsByOwnerIdAndSha256Hash(user.id!!, existing.sha256Hash)) {
+            userFileRepository.save(
+                UserFile(
+                    ownerId = user.id!!,
+                    filePath = existing.filePath,
+                    sha256Hash = existing.sha256Hash,
+                    customHash = existing.customHash
+                )
+            )
+        }
+        user.photoUrl = existing.filePath
+        userRepository.save(user)
+        return existing.customHash
+    }
+
+    private fun createAndSaveFile(file: MultipartFile, hash: String): File {
+        val timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS").format(LocalDateTime.now())
+        val extension = file.originalFilename?.substringAfterLast('.', "") ?: "jpg"
+        val uniqueFileName = "$hash-$timestamp.$extension"
+
+        File(uploadImageDir).apply { if (!exists()) mkdirs() }
+        val path = Paths.get(uploadImageDir, uniqueFileName)
+        Files.write(path, file.bytes)
+
+        return path.toFile()
+    }
+
+    private fun linkNewFile(user: User, savedFile: File, hash: String): String {
+        val fileNameHash = fileUtils.generateObfuscatedFileName(savedFile.name)
+
+        user.photoUrl = savedFile.absolutePath
+        userRepository.save(user)
+
+        userFileRepository.save(
+            UserFile(
+                ownerId = user.id!!,
+                filePath = savedFile.absolutePath,
+                sha256Hash = hash,
+                customHash = fileNameHash
+            )
+        )
+
+        return fileNameHash
+    }
+
 
 }
 
@@ -204,61 +273,109 @@ class MessageServiceImpl(
     private val userRepository: UserRepository,
     private val messagingTemplate: SimpMessagingTemplate,
     private val messageStatusRepository: MessageStatusRepository,
-    private val chatUserRepository: ChatUserRepository
+    private val chatUserRepository: ChatUserRepository,
+    private val attachmentRepository: AttachmentRepository,
+    private val userFileRepository: UserFileRepository,
+    private val fileUtils: FileUtils,
+    @Value("\${file.attachments.path}") private val attachmentsDir: String
 ) : MessageService {
 
     @Transactional
-    override fun sendMessage(request: MessageRequestDTO): MessageResponseDto {
-        val chat = chatRepository.findById(request.chatId)
-            .orElseThrow { ChatNotFoundException(request.chatId) }
+    override fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>?): MessageResponseDTO {
+        val sender = userRepository.findByTelegramIdAndDeletedFalse(getTelegramId())
+            ?: throw UserNotFoundException(getTelegramId())
 
-        val telegramId = getTelegramId()
-        val sender = userRepository.findByTelegramIdAndDeletedFalse(telegramId)
-            ?: throw UserNotFoundException()
+        val chat = if (request.isGroup) {
+            val cid = request.chatId ?: throw ObjectIdNullException()
+            chatRepository.findById(cid).orElseThrow { ChatNotFoundException(cid) }
+                .also { if (!it.isGroup) throw ChatIsNotGroupException(it.isGroup) }
+        } else {
+            val toTid = request.toTelegramId ?: throw ObjectIdNullException()
+            val target = userRepository.findByTelegramIdAndDeletedFalse(toTid)
+                ?: throw UserNotFoundException("recipient $toTid not found")
+            findOrCreateDirectChat(sender, target)
+        }
 
-        if (!chatUserRepository.existsByChatIdAndUserIdAndDeletedFalse(request.chatId, sender.id!!)) {
+        if (!chatUserRepository.existsByChatIdAndUserIdAndDeletedFalse(chat.id!!, sender.id!!)) {
             throw NotChatMemberException()
         }
 
-        val replyTo = request.replyToId?.let {
-            messageRepository.findById(it).orElseThrow { MessageNotFoundException(it) }
+        val replyTo = request.replyToId?.let { rid ->
+            messageRepository.findById(rid).orElseThrow { MessageNotFoundException(rid) }
+                .also { if (it.chat.id != chat.id) throw IllegalArgumentException("replyTo message not in same chat") }
         }
 
-        val message = messageRepository.save(request.toEntity(chat, sender, replyTo))
+        val message = Message(chat = chat, sender = sender, replyTo = replyTo, caption = request.caption, content = request.content)
+        val savedMessage = messageRepository.save(message)
+
+        val attachmentInfos = files?.map { saveAttachmentAndEntity(it, savedMessage) }
+            ?.map { AttachmentInfo(it.id!!, it.url, it.type, it.size) } ?: emptyList()
 
         val chatUsers = chatUserRepository.findAllByChatIdAndDeletedFalse(chat.id!!)
-        chatUsers.forEach { cu ->
+        val statuses = chatUsers.map { cu ->
             val status = if (cu.user.id == sender.id) Status.READ else Status.SENT
-            messageStatusRepository.save(MessageStatus(message = message, user = cu.user, status = status))
+            MessageStatus(message = savedMessage, user = cu.user, status = status)
+        }
+        messageStatusRepository.saveAll(statuses)
+
+        val responseDto = savedMessage.toDTO(Status.SENT).copy(attachments = attachmentInfos)
+
+        messagingTemplate.convertAndSend("/topic/chat/${chat.id}", responseDto)
+        chatUsers.forEach { cu ->
+            messagingTemplate.convertAndSendToUser(cu.user.telegramId, "/queue/messages", responseDto)
         }
 
-        val broadcastDto = message.toResponseDto(Status.SENT)
-        messagingTemplate.convertAndSend(
-            "/topic/chat/${chat.id}",
-            broadcastDto
-        )
-
-        return broadcastDto.copy(status = Status.READ)
+        return responseDto.copy(status = Status.READ)
     }
 
-    override fun getChatMessages(chatId: Long): List<MessageResponseDto> {
-        chatRepository.findById(chatId).orElseThrow { ChatNotFoundException(chatId) }
+    private fun findOrCreateDirectChat(sender: User, target: User): Chat {
+        if (sender.id == target.id) throw IllegalArgumentException("Cannot send message to yourself")
+        val existing = chatRepository.findDirectChat(sender.id!!, target.id!!) ?: chatRepository.findDirectChat(target.id!!, sender.id!!)
+        if (existing != null) return existing
 
-        val telegramId = getTelegramId()
-        val currentUser = userRepository.findByTelegramIdAndDeletedFalse(telegramId)
-            ?: throw UserNotFoundException()
+        val chat = chatRepository.save(Chat(title = null, isGroup = false))
+        listOf(sender to true, target to false).forEach { (user, isOwner) ->
+            chatUserRepository.save(ChatUser(joinedDate = Instant.now(), isOwner = isOwner, chat = chat, user = user))
+        }
+        return chat
+    }
 
-        if (!chatUserRepository.existsByChatIdAndUserIdAndDeletedFalse(chatId, currentUser.id!!)) {
-            throw NotChatMemberException()
+    private fun saveAttachmentAndEntity(file: MultipartFile, message: Message): Attachment {
+        val bytes = file.bytes
+        val sha = fileUtils.calculateSHA256(bytes)
+
+        val existing = userFileRepository.findBySha256Hash(sha)
+        val savedPath = existing?.filePath ?: run {
+            File(attachmentsDir).apply { if (!exists()) mkdirs() }
+            val timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS").format(LocalDateTime.now())
+            val ext = file.originalFilename?.substringAfterLast('.', "") ?: "bin"
+            val uniqueName = "${sha.take(12)}-$timestamp.$ext"
+            val path = Paths.get(attachmentsDir, uniqueName)
+            Files.write(path, bytes)
+
+            val obf = fileUtils.generateObfuscatedFileName(uniqueName)
+            val uf = UserFile(ownerId = message.sender.id!!, filePath = path.toAbsolutePath().toString(), sha256Hash = sha, customHash = obf)
+            userFileRepository.save(uf)
+            uf.filePath
         }
 
-        val messages = messageRepository.findAllByChatIdAndDeletedFalse(chatId)
-        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(currentUser.id!!, chatId)
-        val statusMap = statusList.associateBy { it.message.id!! }
+        return attachmentRepository.save(Attachment(url = savedPath, type = file.contentType ?: "bin", size = file.size, fileHash = sha, message = message))
+    }
 
-        return messages.map { msg ->
-            val status = statusMap[msg.id]?.status ?: Status.NOT_SENT
-            msg.toResponseDto(status)
+    private fun getCurrentUserId(): Long {
+        val tid = (SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken)
+            ?.token?.claims?.get("telegramId")?.toString() ?: throw TelegramDataIsNotValid()
+        return userRepository.findByTelegramIdAndDeletedFalse(tid)?.id ?: throw UserNotFoundException()
+    }
+
+    override fun getChatMessages(chatId: Long): List<MessageResponseDTO> {
+        chatRepository.findById(chatId).orElseThrow { ChatNotFoundException(chatId) }
+        val messages = messageRepository.findAllByChatIdAndDeletedFalse(chatId)
+        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(getCurrentUserId(), chatId)
+        val statusMap = statusList.associateBy { it.message.id!! }
+        return messages.map { m ->
+            val st = statusMap[m.id]?.status ?: Status.SENT
+            m.toDTO(st)
         }
     }
 }

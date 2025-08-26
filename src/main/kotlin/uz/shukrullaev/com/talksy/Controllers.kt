@@ -1,7 +1,9 @@
 package uz.shukrullaev.com.talksy
 
+import org.springframework.http.MediaType
 import org.springframework.messaging.handler.annotation.MessageMapping
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 
 /**
  * @see uz.shukrullaev.com.talksy
@@ -19,20 +21,21 @@ class TelegramAuthController(
         @RequestBody userRequestDTO: UserRequestDTO
     ): TokenDTO = userService.saveOrUpdateFromTelegram(userRequestDTO)
 
-    @GetMapping("/me")
+    @MessageMapping("me")
     fun me(): UserResponseDTO = userService.me()
 
-    @GetMapping("/search")
-    fun searchUsers(@RequestParam keyword: String): List<UserResponseDTO> =
-        userService.searchUsers(keyword)
+    @MessageMapping("search")
+    fun searchByUsername(@RequestParam username: String): List<UserResponseDTO> =
+        userService.searchByUsername(username)
 
-    @GetMapping("/{username}")
-    fun findByUsername(@PathVariable username: String): UserResponseDTO? =
-        userService.findByUsername(username)
-
-    @PutMapping("/profile")
+    @MessageMapping("profile")
     fun updateProfile(@RequestBody request: UserRequestDTO): UserResponseDTO =
         userService.updateProfile(request)
+
+    @PostMapping("/upload", consumes = ["multipart/form-data"])
+    fun uploadImage(
+        @RequestParam("file") file: MultipartFile
+    ): String = userService.uploadImage(file)
 }
 
 @RestController
@@ -58,11 +61,14 @@ class ChatController(
 class MessageController(
     private val messageService: MessageService
 ) {
-    @MessageMapping("Send.message")
-    fun sendMessage(@RequestBody dto: MessageRequestDTO): MessageResponseDto =
-        messageService.sendMessage(dto)
+    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun sendMessage(
+        @RequestPart("payload") payload: MessageRequestDTO,
+        @RequestPart("files", required = false) files: Array<MultipartFile>?
+    ): MessageResponseDTO = messageService.sendMessage(payload, files?.toList())
+
 
     @GetMapping("/chat/{chatId}")
-    fun getChatMessages(@PathVariable chatId: Long): List<MessageResponseDto> =
+    fun getChatMessages(@PathVariable chatId: Long): List<MessageResponseDTO> =
         messageService.getChatMessages(chatId)
 }
