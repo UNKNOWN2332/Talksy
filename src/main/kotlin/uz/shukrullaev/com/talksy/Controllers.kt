@@ -1,6 +1,5 @@
 package uz.shukrullaev.com.talksy
 
-import org.springframework.http.MediaType
 import org.springframework.messaging.handler.annotation.DestinationVariable
 import org.springframework.messaging.handler.annotation.MessageMapping
 import org.springframework.messaging.handler.annotation.Payload
@@ -73,15 +72,18 @@ class ChatWsController(
     @SendToUser("/queue/chats")
     fun createChat(request: ChatRequestDTO): ChatResponseDTO =
         chatService.createChat(request)
+
     @MessageMapping("chat.direct")
     @SendToUser("/queue/chats")
     fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
         chatService.getOrCreateDirectChat(request)
+
     @MessageMapping("chat.my")
     @SendToUser("/queue/chats")
     fun getMyChats(): List<ChatResponseDtoForUsers> =
         chatService.getMyChats()
 }
+
 @Controller
 class MessageController(
     private val messageService: MessageService
