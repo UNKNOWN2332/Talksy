@@ -63,8 +63,8 @@ interface ChatService {
 }
 
 interface MessageService {
-    fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>? = null): MessageResponseDTO
-    fun getChatMessages(chatId: Long): List<MessageResponseDTO>
+    fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>? = null)
+    fun getChatMessages(chatId: Long)
 }
 
 @Service
@@ -281,7 +281,7 @@ class MessageServiceImpl(
 ) : MessageService {
 
     @Transactional
-    override fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>?): MessageResponseDTO {
+    override fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>?){
         val sender = userRepository.findByTelegramIdAndDeletedFalse(getTelegramId())
             ?: throw UserNotFoundException(getTelegramId())
 
@@ -324,9 +324,20 @@ class MessageServiceImpl(
         chatUsers.forEach { cu ->
             messagingTemplate.convertAndSendToUser(cu.user.telegramId, "/queue/messages", responseDto)
         }
-
-        return responseDto.copy(status = Status.READ)
     }
+
+    override fun getChatMessages(chatId: Long) {
+        chatRepository.findById(chatId).orElseThrow { ChatNotFoundException(chatId) }
+        val messages = messageRepository.findAllByChatIdAndDeletedFalse(chatId)
+        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(getCurrentUserId(), chatId)
+        val statusMap = statusList.associateBy { it.message.id!! }
+
+        messagingTemplate.convertAndSendToUser(getTelegramId(), "/queue/messages", messages.map { m ->
+            val st = statusMap[m.id]?.status ?: Status.SENT
+            m.toDTO(st)
+        })
+    }
+
 
     private fun findOrCreateDirectChat(sender: User, target: User): Chat {
         if (sender.id == target.id) throw UserSendMessageConflictException(sender.id!!)
@@ -366,16 +377,5 @@ class MessageServiceImpl(
         val tid = (SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken)
             ?.token?.claims?.get("telegramId")?.toString() ?: throw TelegramDataIsNotValid()
         return userRepository.findByTelegramIdAndDeletedFalse(tid)?.id ?: throw UserNotFoundException()
-    }
-
-    override fun getChatMessages(chatId: Long): List<MessageResponseDTO> {
-        chatRepository.findById(chatId).orElseThrow { ChatNotFoundException(chatId) }
-        val messages = messageRepository.findAllByChatIdAndDeletedFalse(chatId)
-        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(getCurrentUserId(), chatId)
-        val statusMap = statusList.associateBy { it.message.id!! }
-        return messages.map { m ->
-            val st = statusMap[m.id]?.status ?: Status.SENT
-            m.toDTO(st)
-        }
     }
 }

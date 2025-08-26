@@ -1,7 +1,12 @@
 package uz.shukrullaev.com.talksy
 
 import org.springframework.http.MediaType
+import org.springframework.messaging.handler.annotation.DestinationVariable
 import org.springframework.messaging.handler.annotation.MessageMapping
+import org.springframework.messaging.handler.annotation.Payload
+import org.springframework.messaging.handler.annotation.SendTo
+import org.springframework.messaging.simp.annotation.SendToUser
+import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
@@ -11,8 +16,7 @@ import org.springframework.web.multipart.MultipartFile
  * @since 18/08/2025 6:09 pm
  */
 
-@RestController
-@RequestMapping("/api/auth")
+@Controller
 class TelegramAuthController(
     private val userService: UserService
 ) {
@@ -21,54 +25,56 @@ class TelegramAuthController(
         @RequestBody userRequestDTO: UserRequestDTO
     ): TokenDTO = userService.saveOrUpdateFromTelegram(userRequestDTO)
 
-    @MessageMapping("me")
-    fun me(): UserResponseDTO = userService.me()
-
-    @MessageMapping("search")
-    fun searchByUsername(@RequestParam username: String): List<UserResponseDTO> =
-        userService.searchByUsername(username)
-
-    @MessageMapping("profile")
-    fun updateProfile(@RequestBody request: UserRequestDTO): UserResponseDTO =
-        userService.updateProfile(request)
-
     @PostMapping("/upload", consumes = ["multipart/form-data"])
     fun uploadImage(
         @RequestParam("file") file: MultipartFile
     ): String = userService.uploadImage(file)
+
+    @MessageMapping("me")
+    @SendToUser("/queue/me")
+    fun me(): UserResponseDTO = userService.me()
+
+    // username orqali izlash
+    @MessageMapping("search")
+    @SendTo("/topic/search")
+    fun searchByUsername(username: String): List<UserResponseDTO> =
+        userService.searchByUsername(username)
+
+    @MessageMapping("profile")
+    @SendToUser("/queue/profile")
+    fun updateProfile(request: UserRequestDTO): UserResponseDTO =
+        userService.updateProfile(request)
 }
 
-@RestController
-@RequestMapping("/api/chats")
-class ChatController(
-    private val chatService: ChatService
-) {
-    @PostMapping
-    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
-        chatService.createChat(dto)
-
-    @PostMapping("/direct")
-    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
-        chatService.getOrCreateDirectChat(dto)
-
-
-    @GetMapping
-    fun getMyChats(): List<ChatResponseDtoForUsers> =
-        chatService.getMyChats()
-}
-@RestController
-@RequestMapping("/api/messages")
+//@RestController
+//@RequestMapping("/api/chats")
+//class ChatController(
+//    private val chatService: ChatService
+//) {
+//    @PostMapping
+//    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
+//        chatService.createChat(dto)
+//
+//    @PostMapping("/direct")
+//    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
+//        chatService.getOrCreateDirectChat(dto)
+//
+//
+//    @GetMapping
+//    fun getMyChats(): List<ChatResponseDtoForUsers> =
+//        chatService.getMyChats()
+//}
+@Controller
 class MessageController(
     private val messageService: MessageService
 ) {
-    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    fun sendMessage(
-        @RequestPart("payload") payload: MessageRequestDTO,
-        @RequestPart("files", required = false) files: Array<MultipartFile>?
-    ): MessageResponseDTO = messageService.sendMessage(payload, files?.toList())
+    @MessageMapping("/sendMessage")
+    fun sendMessage(@Payload payload: MessageRequestDTO) {
+        messageService.sendMessage(payload, null)
+    }
 
-
-    @GetMapping("/chat/{chatId}")
-    fun getChatMessages(@PathVariable chatId: Long): List<MessageResponseDTO> =
+    @MessageMapping("/getChat/{chatId}")
+    fun getChatMessages(@DestinationVariable chatId: Long) {
         messageService.getChatMessages(chatId)
+    }
 }
