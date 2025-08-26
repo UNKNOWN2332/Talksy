@@ -236,3 +236,10 @@ data class ChatResponseDtoForUsers(
     val participants: List<String>,
     val createdDate: Instant
 )
+
+interface ChatsWithNew {
+    fun getChatId(): Long
+    fun getTitle(): String?
+    fun getLastMessageTime(): Instant?
+    fun getNewMessages(): Long
+}

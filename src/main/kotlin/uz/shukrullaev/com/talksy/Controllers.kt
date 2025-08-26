@@ -62,6 +62,10 @@ class ChatController(
     @GetMapping
     fun getMyChats(): List<ChatResponseDtoForUsers> =
         chatService.getMyChats()
+
+    @GetMapping("chats")
+    fun getChats(): List<ChatsWithNew> =
+        chatService.getChats()
 }
 
 @Controller
@@ -82,6 +86,10 @@ class ChatWsController(
     @SendToUser("/queue/chats")
     fun getMyChats(): List<ChatResponseDtoForUsers> =
         chatService.getMyChats()
+
+    @MessageMapping("chat")
+    fun getChats(): List<ChatsWithNew> =
+        chatService.getChats()
 }
 
 @Controller

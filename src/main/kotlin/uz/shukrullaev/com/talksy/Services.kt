@@ -60,6 +60,8 @@ interface ChatService {
     fun createChat(request: ChatRequestDTO): ChatResponseDTO
     fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers
     fun getMyChats(): List<ChatResponseDtoForUsers>
+
+    fun getChats(): List<ChatsWithNew>
 }
 
 interface MessageService {
@@ -182,8 +184,10 @@ class UserServiceImpl(
 class ChatServiceImpl(
     private val chatRepository: ChatRepository,
     private val userRepository: UserRepository,
-    private val chatUserRepository: ChatUserRepository
-) : ChatService {
+    private val chatUserRepository: ChatUserRepository,
+    private val messagingTemplate: SimpMessagingTemplate,
+
+    ) : ChatService {
 
     @Transactional
     override fun createChat(request: ChatRequestDTO): ChatResponseDTO {
@@ -263,6 +267,14 @@ class ChatServiceImpl(
                 createdDate = chat.createdDate!!
             )
         }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getChats(): List<ChatsWithNew> {
+        val user = userRepository.findByTelegramIdAndDeletedFalse(getTelegramId()) ?: throw UserNotFoundException()
+        val allChats = chatRepository.getAllChats(user.id!!)
+        messagingTemplate.convertAndSendToUser(user.telegramId, "/queue/messages", allChats)
+        return allChats
     }
 }
 

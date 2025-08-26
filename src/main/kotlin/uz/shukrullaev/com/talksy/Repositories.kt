@@ -88,6 +88,35 @@ interface UserFileRepository : BaseRepository<UserFile> {
 interface ChatRepository : BaseRepository<Chat> {
     fun findAllByIsGroupAndDeletedFalse(isGroup: Boolean): List<Chat>
 
+
+    @Query(
+        value = """
+        SELECT
+            c.id              AS chatId,
+            c.title           AS title,
+            c.is_group        AS isGroup,
+            MAX(m.created_date) AS lastMessageTime,
+            COUNT(CASE WHEN ms.status = 'SENT' AND ms.user_id = :userId THEN 1 END) AS newMessages
+        FROM chats c
+        JOIN chat_users cu
+            ON cu.chat_id = c.id
+            AND cu.user_id = :userId
+            AND cu.deleted = false
+        LEFT JOIN messages m
+            ON m.chat_id = c.id
+            AND m.deleted = false
+        LEFT JOIN message_statuses ms
+            ON ms.message_id = m.id
+            AND ms.user_id = :userId
+            AND ms.deleted = false
+        WHERE c.deleted = false
+        GROUP BY c.id, c.title, c.is_group
+        ORDER BY lastMessageTime DESC NULLS LAST
+    """,
+        nativeQuery = true
+    )
+    fun getAllChats(userId: Long): List<ChatsWithNew>
+
     @Query(
         """
         select c from Chat c
