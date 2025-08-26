@@ -46,24 +46,42 @@ class TelegramAuthController(
         userService.updateProfile(request)
 }
 
-//@RestController
-//@RequestMapping("/api/chats")
-//class ChatController(
-//    private val chatService: ChatService
-//) {
-//    @PostMapping
-//    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
-//        chatService.createChat(dto)
-//
-//    @PostMapping("/direct")
-//    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
-//        chatService.getOrCreateDirectChat(dto)
-//
-//
-//    @GetMapping
-//    fun getMyChats(): List<ChatResponseDtoForUsers> =
-//        chatService.getMyChats()
-//}
+@RestController
+@RequestMapping("/api/chats")
+class ChatController(
+    private val chatService: ChatService
+) {
+    @PostMapping
+    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
+        chatService.createChat(dto)
+
+    @PostMapping("/direct")
+    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
+        chatService.getOrCreateDirectChat(dto)
+
+
+    @GetMapping
+    fun getMyChats(): List<ChatResponseDtoForUsers> =
+        chatService.getMyChats()
+}
+
+@Controller
+class ChatWsController(
+    private val chatService: ChatService
+) {
+    @MessageMapping("chat.create")
+    @SendToUser("/queue/chats")
+    fun createChat(request: ChatRequestDTO): ChatResponseDTO =
+        chatService.createChat(request)
+    @MessageMapping("chat.direct")
+    @SendToUser("/queue/chats")
+    fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
+        chatService.getOrCreateDirectChat(request)
+    @MessageMapping("chat.my")
+    @SendToUser("/queue/chats")
+    fun getMyChats(): List<ChatResponseDtoForUsers> =
+        chatService.getMyChats()
+}
 @Controller
 class MessageController(
     private val messageService: MessageService

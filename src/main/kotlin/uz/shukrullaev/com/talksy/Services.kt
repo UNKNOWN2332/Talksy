@@ -213,7 +213,7 @@ class ChatServiceImpl(
         val target = userRepository.findByUsernameAndDeletedFalse(request.username)
             ?: throw UserNotFoundException()
 
-        if (owner.id == target.id) throw IllegalArgumentException("Cannot create chat with yourself")
+        if (owner.id == target.id) throw UserSendMessageConflictException(owner.id!!)
 
 
         var chat = chatRepository.findDirectChat(owner.id!!, target.id!!)
@@ -281,7 +281,7 @@ class MessageServiceImpl(
 ) : MessageService {
 
     @Transactional
-    override fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>?){
+    override fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>?) {
         val sender = userRepository.findByTelegramIdAndDeletedFalse(getTelegramId())
             ?: throw UserNotFoundException(getTelegramId())
 
@@ -305,7 +305,13 @@ class MessageServiceImpl(
                 .also { if (it.chat.id != chat.id) throw ChatConflictException(chat.id!!) }
         }
 
-        val message = Message(chat = chat, sender = sender, replyTo = replyTo, caption = request.caption, content = request.content)
+        val message = Message(
+            chat = chat,
+            sender = sender,
+            replyTo = replyTo,
+            caption = request.caption,
+            content = request.content
+        )
         val savedMessage = messageRepository.save(message)
 
         val attachmentInfos = files?.map { saveAttachmentAndEntity(it, savedMessage) }
@@ -341,7 +347,10 @@ class MessageServiceImpl(
 
     private fun findOrCreateDirectChat(sender: User, target: User): Chat {
         if (sender.id == target.id) throw UserSendMessageConflictException(sender.id!!)
-        val existing = chatRepository.findDirectChat(sender.id!!, target.id!!) ?: chatRepository.findDirectChat(target.id!!, sender.id!!)
+        val existing = chatRepository.findDirectChat(sender.id!!, target.id!!) ?: chatRepository.findDirectChat(
+            target.id!!,
+            sender.id!!
+        )
         if (existing != null) return existing
 
         val chat = chatRepository.save(Chat(title = null, isGroup = false))
@@ -365,12 +374,25 @@ class MessageServiceImpl(
             Files.write(path, bytes)
 
             val obf = fileUtils.generateObfuscatedFileName(uniqueName)
-            val uf = UserFile(ownerId = message.sender.id!!, filePath = path.toAbsolutePath().toString(), sha256Hash = sha, customHash = obf)
+            val uf = UserFile(
+                ownerId = message.sender.id!!,
+                filePath = path.toAbsolutePath().toString(),
+                sha256Hash = sha,
+                customHash = obf
+            )
             userFileRepository.save(uf)
             uf.filePath
         }
 
-        return attachmentRepository.save(Attachment(url = savedPath, type = file.contentType ?: "bin", size = file.size, fileHash = sha, message = message))
+        return attachmentRepository.save(
+            Attachment(
+                url = savedPath,
+                type = file.contentType ?: "bin",
+                size = file.size,
+                fileHash = sha,
+                message = message
+            )
+        )
     }
 
     private fun getCurrentUserId(): Long {
