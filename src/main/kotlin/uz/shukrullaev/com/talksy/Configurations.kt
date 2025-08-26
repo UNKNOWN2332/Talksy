@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.context.support.ResourceBundleMessageSource
+import org.springframework.messaging.Message
 import org.springframework.messaging.MessageChannel
 import org.springframework.messaging.simp.config.ChannelRegistration
 import org.springframework.messaging.simp.config.MessageBrokerRegistry
@@ -32,16 +33,16 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
 import java.nio.charset.StandardCharsets
 import java.security.Key
+import java.security.Principal
 import java.util.*
 import javax.crypto.spec.SecretKeySpec
-import org.springframework.messaging.Message
-import java.security.Principal
 
 
 /**
@@ -63,20 +64,21 @@ class WebMvcConfig : WebMvcConfigurer {
         }
     }
 
-//    override fun addCorsMappings(registry: CorsRegistry) {
-//        registry.addMapping("/**")
-//            .allowedOrigins(
-//                "http://localhost:3000",
-//                "http://localhost:3001",
-//                "http://192.168.0.1:3000",
-//                "http://localhost:3004",
-//                "https://42946bfca812.ngrok-free.app",
-//                "https://talksy-m6ja.onrender.com"
-//            )
-//            .allowedMethods("*")
-//            .allowedHeaders("*")
-//            .allowCredentials(true)
-//    }
+    override fun addCorsMappings(registry: CorsRegistry) {
+        registry.addMapping("/**")
+            .allowedOrigins(
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://192.168.0.1:3000",
+                "http://localhost:3004",
+                "https://42946bfca812.ngrok-free.app",
+                "https://talksy-m6ja.onrender.com",
+                "http://192.168.0.161:3004"
+            )
+            .allowedMethods("*")
+            .allowedHeaders("*")
+            .allowCredentials(true)
+    }
 
 }
 
@@ -135,7 +137,11 @@ class WebSocketConfig(
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
-            .setAllowedOriginPatterns("https://talksy-m6ja.onrender.com","http://localhost:3004","http://localhost:3004")
+            .setAllowedOriginPatterns(
+                "https://talksy-m6ja.onrender.com",
+                "http://localhost:3004",
+                "http://192.168.0.161:3004"
+            )
             .withSockJS()
     }
 
@@ -172,60 +178,12 @@ class AuthChannelInterceptor(
         return message
     }
 }
+
 class StompPrincipal(
     private val name: String
 ) : Principal {
     override fun getName(): String = name
 }
-
-//class JwtHandshakeHandler : DefaultHandshakeHandler() {
-//    override fun determineUser(
-//        request: ServerHttpRequest,
-//        wsHandler: WebSocketHandler,
-//        attributes: MutableMap<String, Any>
-//    ): Principal {
-//        val userId = attributes["userId"] as? String ?: "anonymous"
-//        return UsernamePasswordAuthenticationToken(userId, null)
-//    }
-//}
-//
-//class JwtHandshakeInterceptor(
-//    private val jwtService: JwtService
-//) : HandshakeInterceptor {
-//
-//    override fun beforeHandshake(
-//        request: ServerHttpRequest,
-//        response: ServerHttpResponse,
-//        wsHandler: WebSocketHandler,
-//        attributes: MutableMap<String, Any>
-//    ): Boolean {
-//        val authHeader = request.headers.getFirst("Authorization")
-//        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
-//            response.setStatusCode(HttpStatus.UNAUTHORIZED)
-//            return false
-//        }
-//
-//        try {
-//            val token = authHeader.removePrefix("Bearer ").trim()
-//            val userId = jwtService.extractUserId(token)
-//            attributes["userId"] = userId
-//            // Optionally set authentication for WebSocket context
-//            SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(userId, null, emptyList())
-//            return true
-//        } catch (e: Exception) {
-//            response.setStatusCode(HttpStatus.UNAUTHORIZED)
-//            return false
-//        }
-//    }
-//
-//    override fun afterHandshake(
-//        request: ServerHttpRequest,
-//        response: ServerHttpResponse,
-//        wsHandler: WebSocketHandler,
-//        exception: Exception?
-//    ) {
-//    }
-//}
 
 @Service
 class JwtService(
