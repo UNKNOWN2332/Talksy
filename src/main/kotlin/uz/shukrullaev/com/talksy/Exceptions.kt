@@ -36,6 +36,7 @@ class GlobalExceptionHandler(
         return when (ex) {
             is ExceptionUtil -> ResponseEntity.badRequest()
                 .body(ex.getErrorMessage(errorMessageSource))
+
             else -> ResponseEntity.badRequest()
                 .body(ex.getErrorMessage(errorMessageSource))
         }
@@ -55,19 +56,31 @@ class UserNotFoundException(val username: String? = null) : ExceptionUtil() {
 
 }
 
-class ObjectIdNullException(): ExceptionUtil(){
+
+class ChatConflictException(private val chatId: Long) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.CHAT_CONFLICT
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(chatId)
+
+}
+
+class UserSendMessageConflictException(private val userId: Long) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.USER_SEND_MESSAGE_CONFLICT
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(userId)
+
+}
+
+class ObjectIdNullException() : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.ID_ISNULL
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf()
 }
 
-class ChatIsNotGroupException(val isGroup: Boolean): ExceptionUtil(){
+class ChatIsNotGroupException(val isGroup: Boolean) : ExceptionUtil() {
     override fun exceptionType(): ExceptionsCode = ExceptionsCode.ID_ISNULL
 
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(isGroup)
 
 
 }
-
 
 
 class ChatNotFoundException(private val chatId: Long) : ExceptionUtil() {

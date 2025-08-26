@@ -302,7 +302,7 @@ class MessageServiceImpl(
 
         val replyTo = request.replyToId?.let { rid ->
             messageRepository.findById(rid).orElseThrow { MessageNotFoundException(rid) }
-                .also { if (it.chat.id != chat.id) throw IllegalArgumentException("replyTo message not in same chat") }
+                .also { if (it.chat.id != chat.id) throw ChatConflictException(chat.id!!) }
         }
 
         val message = Message(chat = chat, sender = sender, replyTo = replyTo, caption = request.caption, content = request.content)
@@ -329,7 +329,7 @@ class MessageServiceImpl(
     }
 
     private fun findOrCreateDirectChat(sender: User, target: User): Chat {
-        if (sender.id == target.id) throw IllegalArgumentException("Cannot send message to yourself")
+        if (sender.id == target.id) throw UserSendMessageConflictException(sender.id!!)
         val existing = chatRepository.findDirectChat(sender.id!!, target.id!!) ?: chatRepository.findDirectChat(target.id!!, sender.id!!)
         if (existing != null) return existing
 

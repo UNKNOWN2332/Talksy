@@ -14,6 +14,8 @@ enum class ExceptionsCode(val code: Int) {
     NOT_CHAT_MEMBER(104),
     MESSAGE_NOT_FOUND(105),
     ID_ISNULL(106),
+    CHAT_CONFLICT(106),
+    USER_SEND_MESSAGE_CONFLICT(106),
 }
 
 enum class Status {
