@@ -135,7 +135,7 @@ class WebSocketConfig(
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
-            .setAllowedOriginPatterns("*")
+            .setAllowedOriginPatterns("https://talksy-m6ja.onrender.com","http://localhost:3004","http://localhost:3004")
             .withSockJS()
     }
 
