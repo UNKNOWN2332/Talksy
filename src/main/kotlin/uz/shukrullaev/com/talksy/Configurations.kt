@@ -165,16 +165,27 @@ class AuthChannelInterceptor(
         val accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor::class.java)
             ?: return message
 
+        // Faqat CONNECT komandasi uchun ishlaydi
         if (StompCommand.CONNECT == accessor.command) {
             val authHeader = accessor.getFirstNativeHeader("Authorization")
-            if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
-                throw IllegalArgumentException("Missing or invalid Authorization header")
-            }
-            val token = authHeader.removePrefix("Bearer ").trim()
-            val userId = jwtService.extractUserId(token)
 
-            accessor.user = StompPrincipal(userId.toString())
+            if (!authHeader.isNullOrBlank() && authHeader.startsWith("Bearer ")) {
+                try {
+                    val token = authHeader.removePrefix("Bearer ").trim()
+                    val userId = jwtService.extractUserId(token)
+                    // StompPrincipal orqali userni o‘rnatish
+                    accessor.user = StompPrincipal(userId.toString())
+                    println("STOMP CONNECT: userId set qilindi = $userId")
+                } catch (ex: Exception) {
+                    // Token invalid bo‘lsa ham ulanishni to‘xtatmaymiz
+                    println("Token valid emas: ${ex.message}")
+                }
+            } else {
+                // Header yo‘q bo‘lsa ham ulanishni ruxsat beramiz
+                println("CONNECT headerda Authorization yo‘q, ulanish davom etadi")
+            }
         }
+
         return message
     }
 }
