@@ -88,6 +88,17 @@ interface UserFileRepository : BaseRepository<UserFile> {
 interface ChatRepository : BaseRepository<Chat> {
     fun findAllByIsGroupAndDeletedFalse(isGroup: Boolean): List<Chat>
 
+    @Query(
+        """
+    select c from Chat c 
+        join ChatUser cu1 on cu1.chat = c
+        join ChatUser cu2 on cu2.chat = c
+            where c.isGroup = false
+              and cu1.user.id = :user1Id 
+              and cu2.user.id = :user2Id
+         """
+    )
+    fun findDirectChatBetween(user1Id: Long, user2Id: Long): Chat?
 
     @Query(
         value = """
@@ -151,6 +162,14 @@ interface MessageRepository : BaseRepository<Message> {
     fun findAllBySenderIdAndDeletedFalse(senderId: Long): List<Message>
     fun findAllByReplyToIdAndDeletedFalse(replyToId: Long): List<Message>
     fun findAllByChatIdAndDeletedFalse(chatId: Long, pageable: Pageable): Page<Message>
+
+    fun findTopByChatIdOrderByIdDesc(chatId: Long): Message?
+
+    fun findByChatIdAndIdLessThanOrderByIdDesc(
+        chatId: Long,
+        id: Long,
+        pageable: Pageable
+    ): List<Message>
 }
 
 @Repository

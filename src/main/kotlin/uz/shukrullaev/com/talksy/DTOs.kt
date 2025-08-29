@@ -244,3 +244,16 @@ interface ChatsWithNew {
     fun getLastMessageTime(): Instant?
     fun getNewMessages(): Long
 }
+
+data class ChatMessagesRequestDto(
+    val chatId: Long,
+    val beforeId: Long?,
+    val limit: Int = 20
+)
+
+// Serverdan qaytadigan javob (slice)
+data class ChatMessagesResponseDto(
+    val messages: List<MessageResponseDTO>,
+    val nextBeforeId: Long?,
+    val hasMore: Boolean
+)

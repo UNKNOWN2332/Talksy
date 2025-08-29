@@ -112,9 +112,9 @@ class MessageController(
         messageService.sendMessage(payload, null)
     }
 
-    @MessageMapping("/getChat/{chatId}")
-    fun getChatMessages(@DestinationVariable chatId: Long) {
-        messageService.getChatMessages(chatId)
+    @MessageMapping("/getChatMessages")
+    fun getChatMessages(request: ChatMessagesRequestDto) {
+        messageService.getChatMessages(request)
     }
 }
 

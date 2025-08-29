@@ -98,7 +98,7 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
             .setAllowedOriginPatterns(
                 "https://bitter-bars-bow.loca.lt",
                 "http://localhost:3004",
-                "https://10b04efca6bb.ngrok-free.app",
+                "https://8317337dbc9f.ngrok-free.app",
             )
             .withSockJS()
     }

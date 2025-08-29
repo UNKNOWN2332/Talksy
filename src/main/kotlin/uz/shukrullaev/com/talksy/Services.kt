@@ -3,6 +3,7 @@ package uz.shukrullaev.com.talksy
 import jakarta.persistence.EntityNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.domain.PageRequest
 import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -88,7 +89,7 @@ interface ChatService {
 
 interface MessageService {
     fun sendMessage(request: MessageRequestDTO, files: List<MultipartFile>? = null)
-    fun getChatMessages(chatId: Long)
+    fun getChatMessages(request: ChatMessagesRequestDto)
 }
 
 @Service
@@ -367,16 +368,41 @@ class MessageServiceImpl(
         }
     }
 
-    override fun getChatMessages(chatId: Long) {
-        chatRepository.findById(chatId).orElseThrow { ChatNotFoundException(chatId) }
-        val messages = messageRepository.findAllByChatIdAndDeletedFalse(chatId)
-        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(getCurrentUserId(), chatId)
+    override fun getChatMessages(request: ChatMessagesRequestDto) {
+        val chat = chatRepository.findById(request.chatId)
+            .orElseThrow { ChatNotFoundException(request.chatId) }
+
+        // offset sifatida ishlatamiz
+        val startId = request.beforeId
+            ?: messageRepository.findTopByChatIdOrderByIdDesc(chat.id!!)?.id
+            ?: Long.MAX_VALUE
+
+        val messages = messageRepository
+            .findByChatIdAndIdLessThanOrderByIdDesc(
+                chatId = chat.id!!,
+                id = startId,
+                pageable = PageRequest.of(0, request.limit)
+            )
+
+        val currentUserId = getCurrentUserId()
+        val statusList = messageStatusRepository.findAllByUserIdAndMessageChatId(currentUserId, chat.id!!)
         val statusMap = statusList.associateBy { it.message.id!! }
 
-        messagingTemplate.convertAndSendToUser(getTelegramId(), "/queue/messages", messages.map { m ->
-            val st = statusMap[m.id]?.status ?: Status.SENT
-            m.toDTO(st)
-        })
+        val dtoList = messages.map { msg ->
+            val status = statusMap[msg.id]?.status ?: Status.SENT
+            msg.toDTO(status)
+        }
+
+        val nextBeforeId = dtoList.lastOrNull()?.id
+        val hasMore = dtoList.size == request.limit
+
+        val response = ChatMessagesResponseDto(dtoList, nextBeforeId, hasMore)
+
+        messagingTemplate.convertAndSendToUser(
+            getTelegramId().toString(),
+            "/queue/messages",
+            response
+        )
     }
 
 
