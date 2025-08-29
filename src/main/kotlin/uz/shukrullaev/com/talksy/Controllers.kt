@@ -1,13 +1,11 @@
 package uz.shukrullaev.com.talksy
 
-import org.springframework.messaging.handler.annotation.DestinationVariable
-import org.springframework.messaging.handler.annotation.MessageMapping
-import org.springframework.messaging.handler.annotation.Payload
-import org.springframework.messaging.handler.annotation.SendTo
+import org.springframework.messaging.handler.annotation.*
 import org.springframework.messaging.simp.annotation.SendToUser
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
+import java.time.Instant
 
 /**
  * @see uz.shukrullaev.com.talksy
@@ -35,20 +33,34 @@ class TelegramLogin(
 
 @Controller
 class TelegramAuthController(
-    private val userService: UserService
+    private val userService: UserService,
+    private val jwtService: JwtService,
 ) {
-    @MessageMapping("me")
+    @MessageMapping("/me")
     @SendToUser("/queue/me")
-    fun me(): UserResponseDTO = userService.me()
+    fun me(@Header("Authorization") authHeader: String?): UserResponseDTO {
+        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
+            throw TelegramDataIsNotValidException("Missing or invalid Authorization header in STOMP message")
+        }
+        val telegramId = jwtService.extractUserId(authHeader.removePrefix("Bearer ").trim())
+        val user = userService.me(telegramId)
+        return UserResponseDTO(user.id, "", user.username!!, "", "", "", Instant.now())
+    }
+//    @MessageMapping("/me")
+//    @SendToUser("/queue/me")
+//    fun me(@Header("Authorization") authHeader: String?): UserResponseDTO {
+//        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
+//            throw TelegramDataIsNotValidException("Missing or invalid Authorization header in STOMP message")
+//        }
+//        val telegramId = jwtService.extractUserId(authHeader.removePrefix("Bearer ").trim())
+//        return userService.me(telegramId)
+//    }
 
-    // username orqali izlash
     @MessageMapping("search")
-    @SendTo("/topic/search")
     fun searchByUsername(username: String): List<UserResponseDTO> =
         userService.searchByUsername(username)
 
     @MessageMapping("profile")
-    @SendToUser("/queue/profile")
     fun updateProfile(request: UserRequestDTO): UserResponseDTO =
         userService.updateProfile(request)
 }
@@ -80,12 +92,12 @@ class ChatController(
 class ChatWsController(
     private val chatService: ChatService
 ) {
-    @MessageMapping("chat.create")
+    @MessageMapping("chat.create")//TODO need delete this method
     @SendToUser("/queue/chats")
     fun createChat(request: ChatRequestDTO): ChatResponseDTO =
         chatService.createChat(request)
 
-    @MessageMapping("chat.direct")
+    @MessageMapping("chat.direct")//TODO need delete this method
     @SendToUser("/queue/chats")
     fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
         chatService.getOrCreateDirectChat(request)
@@ -114,3 +126,4 @@ class MessageController(
         messageService.getChatMessages(chatId)
     }
 }
+

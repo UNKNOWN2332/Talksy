@@ -234,6 +234,7 @@ data class ChatRequestDtoForUsers(val username: String)
 data class ChatResponseDtoForUsers(
     val id: Long,
     val participants: List<String>,
+    val isGroup: Boolean? = false,
     val createdDate: Instant
 )
 

@@ -1,8 +1,11 @@
 package uz.shukrullaev.com.talksy
 
 import jakarta.persistence.EntityNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.security.authentication.AnonymousAuthenticationToken
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
@@ -15,21 +18,40 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-
 /**
  * @see uz.shukrullaev.com.talksy
  * @author Abdulloh
  * @since 18/08/2025 6:09 pm
  */
 
-fun getTelegramId(): String =
-    (SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken)
-        ?.token
-        ?.claims
-        ?.get("telegramId")
-        ?.toString()
-        ?: throw TelegramDataIsNotValid()
+fun getTelegramId(): String {
+    val logger = LoggerFactory.getLogger("GetTelegramId")
+    val authentication = SecurityContextHolder.getContext().authentication
+        ?: run {
+            logger.error("SecurityContextHolder authentication is null. Ensure the WebSocket STOMP CONNECT or HTTP request includes a valid 'Authorization: Bearer <token>' header.")
+            throw TelegramDataIsNotValidException("Authentication is null. Provide a valid JWT token in the 'Authorization' header.")
+        }
 
+    logger.debug("Authentication type: ${authentication.javaClass.name}, Principal: ${authentication.principal}")
+
+    if (authentication is JwtAuthenticationToken) {
+        val jwt = authentication.token
+        val telegramId = jwt.claims["telegramId"]?.toString()
+        if (telegramId == null) {
+            logger.error("telegramId claim is missing in JWT. Claims: ${jwt.claims}")
+            throw TelegramDataIsNotValidException("telegramId claim is missing in JWT")
+        }
+        return telegramId
+    }
+
+    if (authentication is AnonymousAuthenticationToken) {
+        logger.error("Anonymous authentication detected. Expected a valid JWT token in STOMP CONNECT or HTTP request.")
+        throw TelegramDataIsNotValidException("Anonymous authentication is not allowed. Provide a valid JWT token in the 'Authorization' header.")
+    }
+
+    logger.error("Unsupported authentication type: ${authentication.javaClass.name}")
+    throw TelegramDataIsNotValidException("Unsupported authentication type: ${authentication.javaClass.name}")
+}
 
 interface UserService {
     fun searchByUsername(username: String): List<UserResponseDTO>
@@ -52,7 +74,7 @@ interface UserService {
         userRequestDTO: UserRequestDTO
     ): TokenDTO
 
-    fun me(): UserResponseDTO
+    fun me(telegramId: String): UserResponseDTO
 
 }
 
@@ -121,8 +143,8 @@ class UserServiceImpl(
         return jwtService.generateToken(userRepository.save(user))
     }
 
-    override fun me(): UserResponseDTO {
-        return userRepository.findByTelegramIdAndDeletedFalse(getTelegramId())
+    override fun me(telegramId: String): UserResponseDTO {
+        return userRepository.findByTelegramIdAndDeletedFalse(telegramId)
             ?.toDTO()
             ?: throw UserNotFoundException()
     }
@@ -264,6 +286,7 @@ class ChatServiceImpl(
             ChatResponseDtoForUsers(
                 id = chat.id!!,
                 participants = participants,
+                isGroup = chat.isGroup,
                 createdDate = chat.createdDate!!
             )
         }

@@ -50,6 +50,12 @@ class TelegramDataIsNotValid(private val requestDTO: UserRequestDTO? = null) : E
 }
 
 
+class TelegramDataIsNotValidException(private val requestDTO: String? = null) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.TELEGRAM_NOT_VALID
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(requestDTO)
+}
+
+
 class UserNotFoundException(val username: String? = null) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.USER_NOT_FOUND
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(username)
