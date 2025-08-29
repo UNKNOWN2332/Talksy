@@ -46,21 +46,12 @@ class TelegramAuthController(
         val user = userService.me(telegramId)
         return UserResponseDTO(user.id, "", user.username!!, "", "", "", Instant.now())
     }
-//    @MessageMapping("/me")
-//    @SendToUser("/queue/me")
-//    fun me(@Header("Authorization") authHeader: String?): UserResponseDTO {
-//        if (authHeader.isNullOrBlank() || !authHeader.startsWith("Bearer ")) {
-//            throw TelegramDataIsNotValidException("Missing or invalid Authorization header in STOMP message")
-//        }
-//        val telegramId = jwtService.extractUserId(authHeader.removePrefix("Bearer ").trim())
-//        return userService.me(telegramId)
-//    }
 
-    @MessageMapping("search")
+    @MessageMapping("searchUser")
     fun searchByUsername(username: String): List<UserResponseDTO> =
         userService.searchByUsername(username)
 
-    @MessageMapping("profile")
+    @MessageMapping("updateProfile")
     fun updateProfile(request: UserRequestDTO): UserResponseDTO =
         userService.updateProfile(request)
 }

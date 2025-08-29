@@ -28,6 +28,9 @@ import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 import org.springframework.web.filter.OncePerRequestFilter
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
@@ -46,20 +49,38 @@ class WebMvcConfig : WebMvcConfigurer {
         setDefaultLocale(Locale("uz"))
         setBasename("errors")
     }
+
+
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val configuration = CorsConfiguration()
+        configuration.allowedOriginPatterns = listOf(  "https://bitter-bars-bow.loca.lt",
+            "http://localhost:3004",
+            "https://10b04efca6bb.ngrok-free.app")
+        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        configuration.allowedHeaders = listOf("*")
+        configuration.allowCredentials = true
+        val source = UrlBasedCorsConfigurationSource()
+        source.registerCorsConfiguration("/**", configuration)
+        return source
+    }
+
 }
 
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val jwtAuthFilter: JwtAuthFilter
+    private val jwtAuthFilter: JwtAuthFilter,
+    private val corsConfigurationSource: CorsConfigurationSource
 ) {
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
+            .cors { it.configurationSource(corsConfigurationSource) }
             .authorizeHttpRequests {
-                it.requestMatchers("/ws/**").permitAll()
+                it.requestMatchers("/ws/**", "/api/auth/login").permitAll()
                 it.anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
@@ -73,8 +94,12 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
-            .setAllowedOriginPatterns("*")
-//            .setAllowedOriginPatterns("https://true-lights-tease.loca.lt","http://localhost:8080")
+//            .setAllowedOriginPatterns("*")
+            .setAllowedOriginPatterns(
+                "https://bitter-bars-bow.loca.lt",
+                "http://localhost:3004",
+                "https://10b04efca6bb.ngrok-free.app",
+            )
             .withSockJS()
     }
 
