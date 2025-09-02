@@ -49,22 +49,6 @@ class WebMvcConfig : WebMvcConfigurer {
         setDefaultLocale(Locale("uz"))
         setBasename("errors")
     }
-
-
-    @Bean
-    fun corsConfigurationSource(): CorsConfigurationSource {
-        val configuration = CorsConfiguration()
-        configuration.allowedOriginPatterns = listOf(  "https://bitter-bars-bow.loca.lt",
-            "http://localhost:3004",
-            "https://10b04efca6bb.ngrok-free.app")
-        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("*")
-        configuration.allowCredentials = true
-        val source = UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/**", configuration)
-        return source
-    }
-
 }
 
 @Configuration
@@ -94,12 +78,7 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
-//            .setAllowedOriginPatterns("*")
-            .setAllowedOriginPatterns(
-                "https://bitter-bars-bow.loca.lt",
-                "http://localhost:3004",
-                "https://8317337dbc9f.ngrok-free.app",
-            )
+            .setAllowedOriginPatterns("*")
             .withSockJS()
     }
 

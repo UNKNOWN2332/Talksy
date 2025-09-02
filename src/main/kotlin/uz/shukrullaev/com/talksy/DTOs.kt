@@ -1,8 +1,6 @@
 package uz.shukrullaev.com.talksy
 
-import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
-import org.springframework.web.multipart.MultipartFile
 import java.time.Instant
 import java.util.*
 
@@ -59,37 +57,9 @@ fun User.toDTO() = UserResponseDTO(
     authDate = authDate
 )
 
-data class UserFileRequestDTO(
-    @field:NotNull val ownerId: Long,
-    @field:NotNull val file: MultipartFile
-)
-
-data class UserFileResponseDTO(
-    val id: Long,
-    val ownerId: Long,
-    val filePath: String,
-    val sha256Hash: String,
-    val customHash: String,
-    val createdDate: Instant?,
-    val modifiedDate: Instant?
-)
-
-fun UserFileRequestDTO.toEntity(filePath: String, sha256Hash: String, customHash: String) =
-    UserFile(ownerId = ownerId, filePath = filePath, sha256Hash = sha256Hash, customHash = customHash)
-
-fun UserFile.toDTO() = UserFileResponseDTO(
-    id = id!!,
-    ownerId = ownerId,
-    filePath = filePath,
-    sha256Hash = sha256Hash,
-    customHash = customHash,
-    createdDate = createdDate,
-    modifiedDate = modifiedDate
-)
-
 data class ChatRequestDTO(
     val title: String?,
-    @field:NotNull val isGroup: Boolean
+    @field:NotNull var isGroup: Boolean
 )
 
 data class ChatResponseDTO(
@@ -142,14 +112,18 @@ data class MessageResponseDTO(
     val caption: String?,
     val attachments: List<AttachmentInfo> = emptyList(),
     val createdDate: Instant,
+    val customHash: String? = null,
     val status: Status
 )
 
 data class AttachmentInfo(
-    val id: Long,
-    val url: String,
+    val id: Long?,
+    val customHash: String,
     val type: String?,
-    val size: Long?
+    val size: Long?,
+    val duration: Int?,
+    val height: Int?,
+    val width: Int?
 )
 
 fun MessageRequestDTO.toEntity(chat: Chat, sender: User, replyTo: Message? = null) =
@@ -168,16 +142,17 @@ fun Message.toDTO(status: Status): MessageResponseDTO = MessageResponseDTO(
 
 fun Attachment.toInfo() = AttachmentInfo(
     id = id!!,
-    url = url,
-    type = type,
-    size = size
+    customHash = file.customHash,
+    type = file.mimeType,
+    size = file.size,
+    duration = file.duration,
+    height = file.height,
+    width = file.width
 )
 
 data class ChatUserRequestDTO(
-    @field:NotNull val joinedDate: Instant,
-    @field:NotNull val isOwner: Boolean,
     val chatId: Long,
-    val userId: Long
+    val userIds: List<Long>
 )
 
 data class ChatUserResponseDTO(
@@ -189,7 +164,7 @@ data class ChatUserResponseDTO(
 )
 
 fun ChatUserRequestDTO.toEntity(chat: Chat, user: User) =
-    ChatUser(joinedDate = joinedDate, isOwner = isOwner, chat = chat, user = user)
+    ChatUser(joinedDate = Instant.now(), isOwner = false, chat = chat, user = user)
 
 fun ChatUser.toDTO() = ChatUserResponseDTO(
     id = id!!,
@@ -199,50 +174,21 @@ fun ChatUser.toDTO() = ChatUserResponseDTO(
     userId = user.id!!
 )
 
-data class AttachmentRequestDTO(
-    @field:NotBlank val url: String,
-    @field:NotBlank val type: String,
-    val size: Long?,
-    val duration: Int?,
-    @field:NotBlank val fileHash: String,
-    val messageId: Long
-)
-
-data class AttachmentResponseDTO(
-    val id: Long,
-    val url: String,
-    val type: String,
-    val size: Long?,
-    val duration: Int?,
-    val messageId: Long
-)
-
-fun AttachmentRequestDTO.toEntity(message: Message) =
-    Attachment(url = url, type = type, size = size, duration = duration, fileHash = fileHash, message = message)
-
-fun Attachment.toDTO() = AttachmentResponseDTO(
-    id = id!!,
-    url = url,
-    type = type,
-    size = size,
-    duration = duration,
-    messageId = message.id!!
-)
-
 data class ChatRequestDtoForUsers(val username: String)
 
 data class ChatResponseDtoForUsers(
     val id: Long,
     val participants: List<String>,
     val isGroup: Boolean? = false,
-    val createdDate: Instant
+    val createdDate: Instant,
+    var name: String? = null
 )
 
 interface ChatsWithNew {
     fun getChatId(): Long
     fun getTitle(): String?
     fun getLastMessageTime(): Instant?
-    fun getNewMessages(): Long
+    fun getNewMessageNumber(): Long
 }
 
 data class ChatMessagesRequestDto(
@@ -251,9 +197,17 @@ data class ChatMessagesRequestDto(
     val limit: Int = 20
 )
 
-// Serverdan qaytadigan javob (slice)
 data class ChatMessagesResponseDto(
     val messages: List<MessageResponseDTO>,
     val nextBeforeId: Long?,
     val hasMore: Boolean
 )
+
+data class MessageUpdateRequestDTO(
+    val chatId: Long,
+    val messageId: Long,
+    val content: String?,
+    val caption: String?,
+    val customHash: String,
+)
+

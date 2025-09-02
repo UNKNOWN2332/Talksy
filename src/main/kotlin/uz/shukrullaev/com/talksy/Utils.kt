@@ -1,9 +1,7 @@
 package uz.shukrullaev.com.talksy
 
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import java.io.File
 import java.security.MessageDigest
 import java.util.*
@@ -70,12 +68,9 @@ class FileUtils {
 
     fun generateObfuscatedFileName(originalName: String): String {
         val uuid = UUID.randomUUID().toString().replace("-", "")
-        val ext = originalName.substringAfterLast('.', "")
-        val base = Base64.getUrlEncoder().withoutPadding()
+        return Base64.getUrlEncoder().withoutPadding()
             .encodeToString(uuid.toByteArray())
             .take(16)
-
-        return if (ext.isNotEmpty()) "$base.$ext" else base
     }
     fun calculateSHA256(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")

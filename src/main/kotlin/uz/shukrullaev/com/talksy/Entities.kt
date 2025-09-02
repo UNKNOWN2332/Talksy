@@ -37,12 +37,18 @@ class User(
 ) : BaseEntity()
 
 @Entity
-@Table(name = "user_files")
-class UserFile(
+@Table(name = "app_files")
+class AppFile(
     @Column(nullable = false) var ownerId: Long,
     @Column(nullable = false) var filePath: String,
     @Column(nullable = false, unique = true) var sha256Hash: String,
-    @Column(nullable = false, unique = true) var customHash: String
+    @Column(nullable = false, unique = true) var customHash: String,
+    @Column(nullable = false) var mimeType: String,
+    @Enumerated(EnumType.STRING) @Column(nullable = false) var type: MessageType = MessageType.TEXT,
+    var size: Long? = null,
+    var duration: Int? = null,
+    var height: Int? = null,
+    var width: Int? = null
 ) : BaseEntity()
 
 @Entity
@@ -50,14 +56,6 @@ class UserFile(
 class Chat(
     var title: String? = null,
     @Column(nullable = false) var isGroup: Boolean = false,
-
-    @ManyToMany
-    @JoinTable(
-        name = "chat_participants",
-        joinColumns = [JoinColumn(name = "chat_id")],
-        inverseJoinColumns = [JoinColumn(name = "user_id")]
-    )
-    var participants: MutableList<User> = mutableListOf()
 ) : BaseEntity()
 
 @Entity
@@ -74,11 +72,11 @@ class ChatUser(
 class Message(
     @ManyToOne(optional = false) var chat: Chat,
     @ManyToOne(optional = false) var sender: User,
+    @ManyToOne var recipient: User? = null,
     @ManyToOne var replyTo: Message? = null,
     var caption: String? = null,
     @Enumerated(EnumType.STRING) @Column(nullable = false) var type: MessageType = MessageType.TEXT,
     @Lob var content: String? = null,
-    @Column var filePath: String? = null,
     @OneToMany(mappedBy = "message", cascade = [CascadeType.ALL], orphanRemoval = true)
     var attachments: MutableList<Attachment> = mutableListOf()
 ) : BaseEntity()
@@ -86,11 +84,7 @@ class Message(
 @Entity
 @Table(name = "attachments")
 class Attachment(
-    @Column(nullable = false) var url: String,
-    @Column(nullable = false) var type: String,
-    var size: Long? = null,
-    var duration: Int? = null,
-    @Column(nullable = false, unique = true) var fileHash: String? = null,
+    @ManyToOne(optional = false) var file: AppFile,
     @ManyToOne(optional = false) var message: Message
 ) : BaseEntity()
 

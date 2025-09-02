@@ -14,8 +14,15 @@ enum class ExceptionsCode(val code: Int) {
     NOT_CHAT_MEMBER(104),
     MESSAGE_NOT_FOUND(105),
     ID_ISNULL(106),
-    CHAT_CONFLICT(106),
-    USER_SEND_MESSAGE_CONFLICT(106),
+    CHAT_CONFLICT(107),
+    USER_SEND_MESSAGE_CONFLICT(109),
+    BEFORE_ID_IS_DELETED(109),
+    USERNAME_ALREADY_EXISTS(110),
+    FILE_NOT_FOUND(111),
+    CONFLICT_MESSAGE(112),
+    TITLE_NULL(113),
+    IDS_ISNULL(114),
+    IS_NOT_OWNER(115),
 }
 
 enum class Status {
@@ -23,7 +30,8 @@ enum class Status {
     SENDING,
     SENT,
     DELIVERED,
-    READ
+    READ,
+    DELETED
 }
 
 enum class MessageType {
@@ -31,4 +39,6 @@ enum class MessageType {
     VIDEO,
     AUDIO,
     MP3,
+    PHOTO,
+    UNKNOWN
 }

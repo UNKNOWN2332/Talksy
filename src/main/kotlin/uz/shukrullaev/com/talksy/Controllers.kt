@@ -1,5 +1,9 @@
 package uz.shukrullaev.com.talksy
 
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.messaging.handler.annotation.*
 import org.springframework.messaging.simp.annotation.SendToUser
 import org.springframework.stereotype.Controller
@@ -48,7 +52,7 @@ class TelegramAuthController(
     }
 
     @MessageMapping("searchUser")
-    fun searchByUsername(username: String): List<UserResponseDTO> =
+    fun searchByUsername(username: String): UserResponseDTO? =
         userService.searchByUsername(username)
 
     @MessageMapping("updateProfile")
@@ -62,45 +66,44 @@ class ChatController(
     private val chatService: ChatService
 ) {
     @PostMapping
-    fun createChat(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
-        chatService.createChat(dto)
+    fun createGroup(@RequestBody dto: ChatRequestDTO): ChatResponseDTO =
+        chatService.createGroup(dto)
+//
+//    @PostMapping("/direct")
+//    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
+//        chatService.getOrCreateDirectChat(dto)
 
-    @PostMapping("/direct")
-    fun getOrCreateDirectChat(@RequestBody dto: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
-        chatService.getOrCreateDirectChat(dto)
-
-
-    @GetMapping
-    fun getMyChats(): List<ChatResponseDtoForUsers> =
-        chatService.getMyChats()
+//    @GetMapping
+//    fun getMyChats(): List<ChatResponseDtoForUsers> =
+//        chatService.getMyChats()
 
     @GetMapping("chats")
-    fun getChats(): List<ChatsWithNew> =
-        chatService.getChats()
+    fun getChats(pageable: Pageable): Page<ChatsWithNew> =
+        chatService.getChats(pageable)
 }
 
 @Controller
 class ChatWsController(
     private val chatService: ChatService
 ) {
-    @MessageMapping("chat.create")//TODO need delete this method
+    @MessageMapping("chat.create")
     @SendToUser("/queue/chats")
-    fun createChat(request: ChatRequestDTO): ChatResponseDTO =
-        chatService.createChat(request)
+    fun createGroup(request: ChatRequestDTO): ChatResponseDTO =
+        chatService.createGroup(request)
+//
+//    @MessageMapping("chat.direct")//TODO need delete this method
+//    @SendToUser("/queue/chats")
+//    fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
+//        chatService.getOrCreateDirectChat(request)
 
-    @MessageMapping("chat.direct")//TODO need delete this method
-    @SendToUser("/queue/chats")
-    fun getOrCreateDirectChat(request: ChatRequestDtoForUsers): ChatResponseDtoForUsers =
-        chatService.getOrCreateDirectChat(request)
-
-    @MessageMapping("chat.my")
-    @SendToUser("/queue/chats")
-    fun getMyChats(): List<ChatResponseDtoForUsers> =
-        chatService.getMyChats()
+//    @MessageMapping("chat.my")
+//    @SendToUser("/queue/chats")
+//    fun getMyChats(): List<ChatResponseDtoForUsers> =
+//        chatService.getMyChats()
 
     @MessageMapping("chat")
-    fun getChats(): List<ChatsWithNew> =
-        chatService.getChats()
+    fun getChats(pageable: Pageable): Page<ChatsWithNew> =
+        chatService.getChats(pageable)
 }
 
 @Controller
@@ -118,3 +121,20 @@ class MessageController(
     }
 }
 
+@RestController
+@RequestMapping("/api/files")
+class FileController(
+    private val fileService: FileService,
+) {
+    @PostMapping("/upload")
+    fun uploadFile(@RequestParam file: MultipartFile): ResponseEntity<AttachmentInfo> {
+        val uploadedFile = fileService.uploadFile(file)
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(file.contentType ?: "application/octet-stream"))
+            .contentLength(file.size)
+            .header("X-Width", uploadedFile.width.toString())
+            .header("X-Height", uploadedFile.height.toString())
+            .body(uploadedFile)
+    }
+
+}

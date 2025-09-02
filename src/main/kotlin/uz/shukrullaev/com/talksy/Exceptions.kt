@@ -80,6 +80,11 @@ class ObjectIdNullException() : ExceptionUtil() {
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf()
 }
 
+class ObjectIdsNullException(private val userIds: Set<Long?> = emptySet()) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.IDS_ISNULL
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(userIds)
+}
+
 class ChatIsNotGroupException(val isGroup: Boolean) : ExceptionUtil() {
     override fun exceptionType(): ExceptionsCode = ExceptionsCode.ID_ISNULL
 
@@ -89,7 +94,7 @@ class ChatIsNotGroupException(val isGroup: Boolean) : ExceptionUtil() {
 }
 
 
-class ChatNotFoundException(private val chatId: Long) : ExceptionUtil() {
+class ChatNotFoundException(private val chatId: Long? = null) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.CHAT_NOT_FOUND
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(chatId)
 }
@@ -103,7 +108,37 @@ class NotChatMemberException : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.NOT_CHAT_MEMBER
 }
 
+
+class BeforeIdIsDeletedException(private val beforeId: Long) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.BEFORE_ID_IS_DELETED
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(beforeId)
+}
+
 class MessageNotFoundException(private val messageId: Long) : ExceptionUtil() {
     override fun exceptionType() = ExceptionsCode.MESSAGE_NOT_FOUND
     override fun getErrorMessageArguments(): Array<Any?> = arrayOf(messageId)
+}
+
+class UserAlreadyExistsException(private val username: String) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.USERNAME_ALREADY_EXISTS
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(username)
+}
+
+class FileNotFoundException(private val customHash: String) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.FILE_NOT_FOUND
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(customHash)
+}
+
+class ConflictMessageException() : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.CONFLICT_MESSAGE
+}
+
+class TitleNullException() : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.TITLE_NULL
+}
+
+class UserIsNotChatOwnerException(private val firstName: String? = null) : ExceptionUtil() {
+    override fun exceptionType() = ExceptionsCode.IS_NOT_OWNER
+    override fun getErrorMessageArguments(): Array<Any?> = arrayOf(firstName)
+
 }
